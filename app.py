@@ -862,37 +862,108 @@ def toggle_record(record_id): # 移除 @login_required 装饰器
 # --- 管理员账户设置 ---
 @flask_app.route('/admin_settings', methods=['GET', 'POST'])
 def admin_settings(): # 移除 @login_required 装饰器
+    admin_creds = load_admin_credentials() # 确保在处理 POST 前加载
+    if not admin_creds: 
+        flash("管理员账户信息缺失，无法进行设置。", "error")
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
-        old_password = request.form['old_password']
-        new_password = request.form['new_password']
-        confirm_new_password = request.form['confirm_new_password']
+        form_type = request.form.get('form_type')
 
-        admin_creds = load_admin_credentials()
-        if not admin_creds: 
-            flash("管理员账户信息缺失，请联系管理员。", "error")
-            return redirect(url_for('index'))
+        if form_type == 'password_change':
+            old_password = request.form.get('old_password', '').strip()
+            new_password = request.form.get('new_password', '').strip()
+            confirm_new_password = request.form.get('confirm_new_password', '').strip()
 
-        if not check_password_hash(admin_creds["password_hash"], old_password):
-            flash("旧密码不正确。", "error")
-        elif new_password != confirm_new_password:
-            flash("新密码和确认密码不一致。", "error")
-        elif len(new_password) < 6:
-            flash("新密码长度至少为6个字符。", "error")
-        else:
-            new_hashed_password = generate_password_hash(new_password)
-            if save_admin_credentials(admin_creds["username"], new_hashed_password):
-                flash("管理员密码已成功修改！请使用新密码重新登录。", "success")
-                add_log_entry(f"管理员 '{session.get('username')}' 成功修改密码。", "INFO")
-                session.pop('logged_in', None) 
-                session.pop('username', None)
-                return redirect(url_for('login'))
+            # 密码修改逻辑
+            if not old_password and (new_password or confirm_new_password):
+                flash("如需修改密码，请输入当前密码。", "error")
+            elif old_password: # 只有输入了旧密码才尝试修改
+                if not check_password_hash(admin_creds["password_hash"], old_password):
+                    flash("当前密码不正确。", "error")
+                elif not new_password and not confirm_new_password:
+                    flash("未输入新密码，密码未更改。", "info") # 用户可能只是点了保存按钮
+                elif not new_password or not confirm_new_password:
+                    flash("新密码和确认密码均不能为空以进行修改。", "error")
+                elif new_password != confirm_new_password:
+                    flash("新密码和确认密码不一致。", "error")
+                elif len(new_password) < 6:
+                    flash("新密码长度至少为6个字符。", "error")
+                else:
+                    new_hashed_password = generate_password_hash(new_password)
+                    if save_admin_credentials(admin_creds["username"], new_hashed_password):
+                        flash("管理员密码已成功修改！请使用新密码重新登录。", "success")
+                        add_log_entry(f"管理员 '{session.get('username')}' 成功修改密码。", "INFO")
+                        session.pop('logged_in', None) 
+                        session.pop('username', None)
+                        return redirect(url_for('login'))
+                    else:
+                        flash("修改密码时发生错误，请检查日志。", "error")
+                        add_log_entry("修改管理员密码失败。", "ERROR")
+            # 如果旧密码为空且新密码也为空，则不执行任何操作，避免不必要的 flash 消息
+
+        elif form_type == 'api_config_change':
+            new_api_token = request.form.get('cf_api_token', '').strip()
+            new_zone_id = request.form.get('cf_zone_id', '').strip()
+
+            if not new_api_token or not new_zone_id:
+                flash("API Token 和 Zone ID 均不能为空！", "error")
             else:
-                flash("修改密码时发生错误，请检查日志。", "error")
-                add_log_entry("修改管理员密码失败。", "ERROR")
-        
-        return render_template('admin_settings.html', username=session.get('username', '访客'))
+                # 只有当值发生变化时才记录日志和显示成功消息
+                token_changed = GLOBAL_CONFIG["CF_API_TOKEN"] != new_api_token
+                zone_id_changed = GLOBAL_CONFIG["CF_ZONE_ID"] != new_zone_id
 
-    return render_template('admin_settings.html', username=session.get('username', '访客'))
+                if token_changed or zone_id_changed:
+                    GLOBAL_CONFIG["CF_API_TOKEN"] = new_api_token
+                    GLOBAL_CONFIG["CF_ZONE_ID"] = new_zone_id
+                    save_global_config() # 保存到 config.ini
+                    
+                    log_messages = []
+                    if token_changed:
+                        log_messages.append("API Token 已更新")
+                        add_log_entry("Cloudflare API Token 已通过管理员设置更新。", "INFO")
+                    if zone_id_changed:
+                        log_messages.append("Zone ID 已更新")
+                        add_log_entry("Cloudflare Zone ID 已通过管理员设置更新。", "INFO")
+                    
+                    flash(f"Cloudflare API 设置已成功更新 ({', '.join(log_messages)})！DDNS将使用新配置。", "success")
+                    # 触发一次 DDNS 更新检查，以便立即验证新配置（可选）
+                    # run_ddns_update_job(manual_trigger=True) 
+                else:
+                    flash("API 设置未发生变化。", "info")
+        
+        else:
+            flash("无效的表单提交。", "error")
+
+        # 重新渲染页面，保留用户输入或显示错误/成功消息
+        # 为 API 表单准备当前配置的掩码 Token
+        masked_token = ""
+        if GLOBAL_CONFIG["CF_API_TOKEN"]:
+            token_len = len(GLOBAL_CONFIG["CF_API_TOKEN"])
+            if token_len > 8:
+                 masked_token = GLOBAL_CONFIG["CF_API_TOKEN"][:4] + "****" + GLOBAL_CONFIG["CF_API_TOKEN"][-4:]
+            else:
+                 masked_token = "****" # 如果太短，就全掩盖
+        
+        current_display_config = GLOBAL_CONFIG.copy()
+        current_display_config["CF_API_TOKEN"] = masked_token
+
+        return render_template('admin_settings.html', username=session.get('username', '访客'), current_config=current_display_config)
+
+    # GET 请求
+    # 为 API 表单准备当前配置的掩码 Token
+    masked_token = ""
+    if GLOBAL_CONFIG["CF_API_TOKEN"]:
+        token_len = len(GLOBAL_CONFIG["CF_API_TOKEN"])
+        if token_len > 8:
+                masked_token = GLOBAL_CONFIG["CF_API_TOKEN"][:4] + "****" + GLOBAL_CONFIG["CF_API_TOKEN"][-4:]
+        else:
+                masked_token = "****" 
+    
+    current_display_config = GLOBAL_CONFIG.copy()
+    current_display_config["CF_API_TOKEN"] = masked_token
+
+    return render_template('admin_settings.html', username=session.get('username', '访客'), current_config=current_display_config)
 
 
 # --- 主程序和调度器 ---

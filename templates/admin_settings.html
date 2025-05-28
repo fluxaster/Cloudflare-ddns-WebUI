@@ -1,25 +1,51 @@
 {% extends "base.html" %}
 
-{% block title %}管理员账户设置 - Cloudflare DDNS{% endblock %}
+{% block title %}管理员账户与API设置 - Cloudflare DDNS{% endblock %}
 
 {% block content %}
     <h1>管理员账户设置</h1>
     
     <form method="POST" action="{{ url_for('admin_settings') }}">
+        <input type="hidden" name="form_type" value="password_change"> {# 用于区分表单提交类型 #}
+        <h2>修改密码</h2>
         <div class="form-group">
             <label for="old_password">当前密码:</label>
-            <input type="password" id="old_password" name="old_password" required autocomplete="current-password">
+            <input type="password" id="old_password" name="old_password" autocomplete="current-password">
         </div>
         <div class="form-group">
-            <label for="new_password">新密码:</label>
-            <input type="password" id="new_password" name="new_password" required autocomplete="new-password">
+            <label for="new_password">新密码 (留空则不修改):</label>
+            <input type="password" id="new_password" name="new_password" autocomplete="new-password">
         </div>
         <div class="form-group">
             <label for="confirm_new_password">确认新密码:</label>
-            <input type="password" id="confirm_new_password" name="confirm_new_password" required autocomplete="new-password">
+            <input type="password" id="confirm_new_password" name="confirm_new_password" autocomplete="new-password">
         </div>
         <div class="button-group">
-            <button type="submit" class="button">修改密码</button>
+            <button type="submit" class="button">保存密码更改</button>
         </div>
     </form>
-{% endblock %}
+
+    <hr style="margin: 40px 0;">
+
+    <h1>Cloudflare API 设置</h1>
+    <p style="color: var(--text-color); opacity: 0.8;">
+        修改这些设置将直接影响 DDNS 功能。请确保您输入的 API Token 和 Zone ID 正确无误。
+        API Token 推荐使用具有特定区域 DNS 编辑权限的 Token。
+    </p>
+    <form method="POST" action="{{ url_for('admin_settings') }}">
+        <input type="hidden" name="form_type" value="api_config_change"> {# 用于区分表单提交类型 #}
+        <h2>配置 Cloudflare API</h2>
+        <div class="form-group">
+            <label for="cf_api_token">Cloudflare API Token:</label>
+            <input type="password" id="cf_api_token" name="cf_api_token" value="{{ current_config.CF_API_TOKEN }}" required autocomplete="off">
+            <small>输入新 Token 以更新，当前 Token 已部分隐藏。</small>
+        </div>
+        <div class="form-group">
+            <label for="cf_zone_id">Cloudflare Zone ID:</label>
+            <input type="text" id="cf_zone_id" name="cf_zone_id" value="{{ current_config.CF_ZONE_ID }}" required autocomplete="off">
+        </div>
+        <div class="button-group">
+            <button type="submit" class="button button-secondary">保存 API 设置</button>
+        </div>
+    </form>
+{% endblock %}  
