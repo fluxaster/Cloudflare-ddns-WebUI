@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>首次设置管理员账户</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Light Theme (Default) */
+            --bg-color: #f0f8ff;
+            --text-color: #333;
+            --container-bg: #ffffff;
+            --container-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            --h1-color: #4a69bd;
+            --p-color: #666;
+            --label-color: #555;
+            --input-border-color: #ccc;
+            --input-bg-color: #fff;
+            --input-text-color: #333;
+            --button-bg: #28a745; /* Green for setup */
+            --button-hover-bg: #218838;
+            --button-text-color: white;
+            --flash-success-bg: #d4edda; --flash-success-text: #155724; --flash-success-border: #c3e6cb;
+            --flash-error-bg: #f8d7da;   --flash-error-text: #721c24;   --flash-error-border: #f5c6cb;
+            --theme-toggle-button-bg: var(--button-bg); /* Use primary button color for toggle */
+            --theme-toggle-button-hover-bg: var(--button-hover-bg);
+        }
+
+        body[data-theme="dark"] {
+            --bg-color: #1f2937;
+            --text-color: #e5e7eb;
+            --container-bg: #374151;
+            --container-shadow: 0 8px 16px rgba(0,0,0,0.4);
+            --h1-color: #81a2e6;
+            --p-color: #9ca3af;
+            --label-color: #d1d5db;
+            --input-border-color: #52525b;
+            --input-bg-color: #4b5563;
+            --input-text-color: #e5e7eb;
+            --button-bg: #16a34a; /* Darker green */
+            --button-hover-bg: #15803d;
+            --flash-success-bg: #052e16; --flash-success-text: #bbf7d0; --flash-success-border: #166534;
+            --flash-error-bg: #450a0a;   --flash-error-text: #fecaca;   --flash-error-border: #991b1b;
+            --theme-toggle-button-bg: var(--button-bg);
+            --theme-toggle-button-hover-bg: var(--button-hover-bg);
+        }
+
+        body { 
+            font-family: 'Noto Sans SC', sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .theme-toggle-button {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background-color: var(--theme-toggle-button-bg);
+            color: var(--button-text-color);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        .theme-toggle-button:hover {
+            background-color: var(--theme-toggle-button-hover-bg);
+            transform: scale(1.1);
+        }
+        .container {
+            background-color: var(--container-bg);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: var(--container-shadow);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            animation: fadeInScale 0.6s ease-out;
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        h1 {
+            color: var(--h1-color);
+            margin-bottom: 25px;
+            font-size: 2em;
+            transition: color 0.3s;
+        }
+        p {
+            margin-bottom: 20px;
+            color: var(--p-color);
+            transition: color 0.3s;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: var(--label-color);
+            transition: color 0.3s;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="password"] {
+            width: calc(100% - 22px); 
+            padding: 12px;
+            border: 1px solid var(--input-border-color);
+            background-color: var(--input-bg-color);
+            color: var(--input-text-color);
+            border-radius: 6px;
+            font-size: 1.1em;
+            box-sizing: border-box; 
+            transition: border-color 0.3s, background-color 0.3s, color 0.3s;
+        }
+        .button {
+            padding: 12px 25px;
+            background-color: var(--button-bg);
+            color: var(--button-text-color);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+        .button:hover {
+            background-color: var(--button-hover-bg);
+            transform: translateY(-2px);
+        }
+        .flash-messages {
+            list-style: none;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border: 1px solid;
+            font-weight: bold;
+            text-align: left;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
+        .flash-messages li {
+            margin-bottom: 5px;
+        }
+        .flash-messages.success {
+            background-color: var(--flash-success-bg); color: var(--flash-success-text); border-color: var(--flash-success-border);
+        }
+        .flash-messages.error {
+            background-color: var(--flash-error-bg); color: var(--flash-error-text); border-color: var(--flash-error-border);
+        }
+    </style>
+</head>
+<body>
+    <button id="theme-toggle" class="theme-toggle-button" title="切换主题">🌙</button>
+
+    <div class="container">
+        <h1>欢迎！(づ｡◕‿‿◕｡)づ</h1>
+        <p>这是您第一次使用控制面板。请您设置管理员账户的用户名和密码，以确保您的数据安全。</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flash-messages {{ messages[0][0] if messages[0] else '' }}">
+                    {% for category, message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">管理员用户名:</label>
+                <input type="text" id="username" name="username" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label for="password">密码:</label>
+                <input type="password" id="password" name="password" required autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label for="confirm_password">确认密码:</label>
+                <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password">
+            </div>
+            <button type="submit" class="button">立即设置</button>
+        </form>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeToggleButton = document.getElementById('theme-toggle');
+            const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+            let lastToggleTime = 0;
+
+            function applyTheme(theme) {
+                if (theme === 'dark') {
+                    document.body.setAttribute('data-theme', 'dark');
+                    themeToggleButton.textContent = '☀️';
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.body.removeAttribute('data-theme');
+                    themeToggleButton.textContent = '🌙';
+                    localStorage.setItem('theme', 'light');
+                }
+            }
+
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                applyTheme(savedTheme);
+            } else {
+                applyTheme(prefersDarkScheme.matches ? 'dark' : 'light');
+            }
+
+            prefersDarkScheme.addEventListener('change', (e) => {
+                if (!localStorage.getItem('theme')) {
+                    applyTheme(e.matches ? 'dark' : 'light');
+                }
+            });
+
+            themeToggleButton.addEventListener('click', () => {
+                const now = Date.now();
+                if (now - lastToggleTime < 500) { return; }
+                lastToggleTime = now;
+                const currentTheme = document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+                applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+            });
+        });
+    </script>
+</body>
+</html>

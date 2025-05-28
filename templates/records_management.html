@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}DDNS 记录管理{% endblock %}
+
+{% block content %}
+    <h1>DDNS 记录管理:</h1>
+    
+    <div class="button-group">
+        <a href="{{ url_for('add_record') }}" class="button">✨ 添加新记录</a>
+    </div>
+
+    {% if records %} {# 传递过来的变量名是 records 而不是 status.records_status #}
+    <table class="record-table">
+        <thead>
+            <tr>
+                <th>记录名</th>
+                <th>类型</th>
+                <th>代理</th>
+                <th>TTL</th>
+                <th>本机 IP</th>
+                <th>CF IP</th>
+                <th>CF 上次更新</th>
+                <th>状态/信息</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody id="records_table_body">
+            {% for record in records %} {# 循环 records 变量 #}
+            <tr>
+                <td>{{ record.name }}</td>
+                <td>{{ record.type }}</td>
+                <td>{{ '是' if record.proxied else '否' }}</td>
+                <td>{{ record.ttl }}</td>
+                <td>{{ record.local_ip }}</td>
+                <td>{{ record.cloudflare_ip }}</td>
+                <td class="record-status-cell">{{ record.last_updated_cloudflare if record.last_updated_cloudflare != 'N/A' else '未更新' }}</td>
+                <td>{{ record.message }}</td>
+                <td class="record-actions">
+                    <form action="/records/toggle/{{record.id}}" method="post" style="display:inline;">
+                        <button type="submit" class="button {% if record.enabled %}button-toggle{% else %}button-toggle-off{% endif %}">
+                            {% if record.enabled %}禁用{% else %}启用{% endif %}
+                        </button>
+                    </form>
+                    <a href="/records/edit/{{record.id}}" class="button button-edit">编辑</a>
+                    <form action="/records/delete/{{record.id}}" method="post" style="display:inline;" onsubmit="return confirm('确定要删除记录 {{ record.name }} ({{ record.type }}) 吗？');">
+                        <button type="submit" class="button button-delete">删除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>您还没有添加任何DDNS记录呢。点击“添加新记录”按钮来开始吧~ (っ.❛ ᴗ ❛.)っ</p>
+    {% endif %}
+
+    <script>
+        // 此页面也需要自动刷新，但只刷新记录列表
+        function autoRefreshRecords() {
+            fetch("{{ url_for('status_json') }}") // 获取整个状态快照
+                .then(response => response.json())
+                .then(data => {
+                    const recordsTableBody = document.getElementById('records_table_body');
+                    if (recordsTableBody) {
+                        recordsTableBody.innerHTML = ''; // 清空旧记录
+                        data.records_status.forEach(record => {
+                            const row = recordsTableBody.insertRow();
+                            row.innerHTML = `
+                                <td>${record.name}</td>
+                                <td>${record.type}</td>
+                                <td>${record.proxied ? '是' : '否'}</td>
+                                <td>${record.ttl}</td>
+                                <td>${record.local_ip}</td>
+                                <td>${record.cloudflare_ip}</td>
+                                <td class="record-status-cell">${record.last_updated_cloudflare !== 'N/A' ? record.last_updated_cloudflare : '未更新'}</td>
+                                <td>${record.message}</td>
+                                <td class="record-actions">
+                                    <form action="/records/toggle/${record.id}" method="post" style="display:inline;">
+                                        <button type="submit" class="button ${record.enabled ? 'button-toggle' : 'button-toggle-off'}">
+                                            ${record.enabled ? '禁用' : '启用'}
+                                        </button>
+                                    </form>
+                                    <a href="/records/edit/${record.id}" class="button button-edit">编辑</a>
+                                    <form action="/records/delete/${record.id}" method="post" style="display:inline;" onsubmit="return confirm('确定要删除记录 ${record.name} (${record.type}) 吗？');">
+                                        <button type="submit" class="button button-delete">删除</button>
+                                    </form>
+                                </td>
+                            `;
+                        });
+                    }
+                });
+        }
+        setInterval(autoRefreshRecords, 5000); // 每5秒刷新记录列表
+        document.addEventListener('DOMContentLoaded', autoRefreshRecords); // 页面加载时首次刷新
+    </script>
+{% endblock %}

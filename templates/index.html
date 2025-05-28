@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}状态总览 - Cloudflare DDNS{% endblock %}
+
+{% block content %}
+    <h1>全局状态总览:</h1>
+    
+    <div class="status-grid">
+        <div class="status-item"><strong>本机公网 IPv4:</strong> <span id="current_ipv4">{{ status.current_ipv4 }}</span></div>
+        <div class="status-item"><strong>本机公网 IPv6:</strong> <span id="current_ipv6">{{ status.current_ipv6 }}</span></div>
+        <div class="status-item"><strong>上次检查时间:</strong> <span id="last_checked">{{ status.last_checked }}</span></div>
+        <div class="status-item"><strong>当前操作信息:</strong> <span id="status_message">{{ status.status_message }}</span></div>
+    </div>
+
+    <div class="button-group">
+        <form action="{{ url_for('trigger_update') }}" method="post">
+            <button type="submit" class="button button-secondary">手动触发更新检查</button>
+        </form>
+        <!-- 在这里移除直接跳转设置和添加记录的按钮，因为现在有导航栏 -->
+    </div>
+
+    <h2>运行日志:</h2>
+    <div class="log-container" id="log_history">
+        {% for entry in status.log_history %}
+        <div class="log-entry 
+            {% if '[ERROR]' in entry %}error{% elif '[WARNING]' in entry %}warning{% elif '[DEBUG]' in entry %}debug{% endif %}
+        ">{{ entry }}</div>
+        {% endfor %}
+    </div>
+
+    <!-- 重新启用并修复自动刷新脚本 -->
+    <script>
+        function autoRefreshStatus() {
+            fetch("{{ url_for('status_json') }}")
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('current_ipv4').textContent = data.current_ipv4;
+                    document.getElementById('current_ipv6').textContent = data.current_ipv6;
+                    document.getElementById('last_checked').textContent = data.last_checked;
+                    document.getElementById('status_message').textContent = data.status_message;
+                    
+                    // 注意：这里不再刷新records_table_body，因为它现在在records_management页面了
+                    // const recordsTableBody = document.getElementById('records_table_body');
+                    // if (recordsTableBody) {
+                    //     recordsTableBody.innerHTML = ''; 
+                    //     data.records_status.forEach(record => { /* ... */ });
+                    // }
+
+                    const logContainer = document.getElementById('log_history');
+                    logContainer.innerHTML = ''; 
+                    data.log_history.forEach(entry => {
+                        const div = document.createElement('div');
+                        div.className = 'log-entry';
+                        if (entry.includes('[ERROR]')) div.classList.add('error');
+                        else if (entry.includes('[WARNING]')) div.classList.add('warning');
+                        else if (entry.includes('[DEBUG]')) div.classList.add('debug');
+                        div.textContent = entry;
+                        logContainer.appendChild(div);
+                    });
+                });
+        }
+
+        setInterval(autoRefreshStatus, 5000); 
+        document.addEventListener('DOMContentLoaded', autoRefreshStatus);
+    </script>
+{% endblock %}

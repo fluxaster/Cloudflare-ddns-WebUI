@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Cloudflare DDNS 控制面板~{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Light Theme (Default) */
+            --bg-color: #e0f2f7;
+            --text-color: #333;
+            --container-bg: #ffffff;
+            --container-shadow: 0 6px 12px rgba(0,0,0,0.15);
+            --sidebar-bg-start: #4a69bd;
+            --sidebar-bg-end: #6a85b6;
+            --sidebar-text-color: white;
+            --sidebar-active-bg: rgba(255,255,255,0.2);
+            --sidebar-active-border: #ffc107;
+            --header-main-bg: #ffffff;
+            --header-main-text: #5d5d5d;
+            --header-main-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            --h2-color: #4a69bd;
+            --h2-border-color: #a6d8f5;
+            --input-border-color: #ccc;
+            --input-text-color: #333; /* Added for inputs */
+            --input-bg-color: #fff; /* Added for inputs */
+            --button-primary-bg: #28a745;
+            --button-primary-hover-bg: #218838;
+            --button-secondary-bg: #007bff;
+            --button-secondary-hover-bg: #0056b3;
+            --button-danger-bg: #dc3545;
+            --button-danger-hover-bg: #c82333;
+            --button-warning-bg: #ffc107;
+            --button-warning-hover-bg: #e0a800;
+            --button-warning-text: #333;
+            --button-info-bg: #17a2b8;
+            --button-info-hover-bg: #138496;
+            --button-light-bg: #6c757d;
+            --button-light-hover-bg: #5a6268;
+            --button-text-color: white;
+            --table-border-color: #ddd;
+            --table-th-bg: #f2f2f2;
+            --table-th-text: #555;
+            --table-row-even-bg: #f9f9f9;
+            --table-row-hover-bg: #f1f8ff;
+            --log-container-bg: #2b2b2b; /* Kept dark for readability, can be themed too */
+            --log-container-text: #e0e0e0;
+            --log-border-color: #444;
+            --flash-success-bg: #d4edda; --flash-success-text: #155724; --flash-success-border: #c3e6cb;
+            --flash-error-bg: #f8d7da;   --flash-error-text: #721c24;   --flash-error-border: #f5c6cb;
+            --flash-warning-bg: #fff3cd; --flash-warning-text: #856404; --flash-warning-border: #ffeeba;
+            --flash-info-bg: #d1ecf1;    --flash-info-text: #0c5460;    --flash-info-border: #bee5eb;
+        }
+
+        body[data-theme="dark"] {
+            --bg-color: #1f2937; /* Dark gray */
+            --text-color: #e5e7eb; /* Light gray */
+            --container-bg: #374151; /* Medium-dark gray */
+            --container-shadow: 0 6px 12px rgba(0,0,0,0.3);
+            --sidebar-bg-start: #3c5aa4; /* Slightly darker blue */
+            --sidebar-bg-end: #58719f;
+            --sidebar-text-color: #e5e7eb;
+            --sidebar-active-bg: rgba(255,255,255,0.1);
+            --sidebar-active-border: #f59e0b; /* Darker yellow/orange */
+            --header-main-bg: #374151;
+            --header-main-text: #d1d5db;
+            --header-main-shadow: 0 2px 5px rgba(0,0,0,0.25);
+            --h2-color: #81a2e6; /* Lighter blue for dark bg */
+            --h2-border-color: #5c7ead;
+            --input-border-color: #52525b; /* zinc-600 */
+            --input-text-color: #e5e7eb; 
+            --input-bg-color: #374151; /* same as container */
+            --button-primary-bg: #16a34a; /* green-600 */
+            --button-primary-hover-bg: #15803d; /* green-700 */
+            --button-secondary-bg: #2563eb; /* blue-600 */
+            --button-secondary-hover-bg: #1d4ed8; /* blue-700 */
+            --button-danger-bg: #dc2626; /* red-600 */
+            --button-danger-hover-bg: #b91c1c; /* red-700 */
+            --button-warning-bg: #f59e0b; /* amber-500 */
+            --button-warning-hover-bg: #d97706; /* amber-600 */
+            --button-warning-text: #1f2937; /* Dark text on yellow */
+            --button-info-bg: #0ea5e9; /* sky-500 */
+            --button-info-hover-bg: #0284c7; /* sky-600 */
+            --button-light-bg: #4b5563; /* gray-600 */
+            --button-light-hover-bg: #374151; /* gray-700 */
+            --table-border-color: #4b5563;
+            --table-th-bg: #374151;
+            --table-th-text: #e5e7eb;
+            --table-row-even-bg: #2c3542; /* Slightly different from main container */
+            --table-row-hover-bg: #4a5462;
+            --log-container-bg: #1a202c; /* Even darker for logs */
+            --log-container-text: #cbd5e0;
+            --log-border-color: #2d3748;
+            --flash-success-bg: #052e16; --flash-success-text: #bbf7d0; --flash-success-border: #166534;
+            --flash-error-bg: #450a0a;   --flash-error-text: #fecaca;   --flash-error-border: #991b1b;
+            --flash-warning-bg: #422006; --flash-warning-text: #fef3c7; --flash-warning-border: #92400e;
+            --flash-info-bg: #0c2f38;    --flash-info-text: #a5f3fc;    --flash-info-border: #155e75;
+        }
+
+        body { 
+            font-family: 'Noto Sans SC', sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            line-height: 1.6;
+            display: flex; 
+            min-height: 100vh; 
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .theme-toggle-button {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background-color: var(--button-secondary-bg);
+            color: var(--button-text-color);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        .theme-toggle-button:hover {
+            background-color: var(--button-secondary-hover-bg);
+            transform: scale(1.1);
+        }
+
+        .sidebar {
+            width: 250px;
+            background: linear-gradient(180deg, var(--sidebar-bg-start) 0%, var(--sidebar-bg-end) 100%);
+            color: var(--sidebar-text-color);
+            padding: 20px 0;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: background 0.3s, color 0.3s;
+        }
+        .sidebar h2 {
+            margin-top: 0;
+            margin-bottom: 30px;
+            font-size: 1.8em;
+            text-align: center;
+            color: var(--sidebar-text-color); /* Using sidebar text color, or can be specific */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        .sidebar-nav {
+            list-style: none;
+            padding: 0;
+            width: 100%;
+        }
+        .sidebar-nav li {
+            margin-bottom: 10px;
+        }
+        .sidebar-nav a {
+            display: block;
+            color: var(--sidebar-text-color);
+            text-decoration: none;
+            padding: 15px 20px;
+            transition: background-color 0.3s ease, transform 0.1s ease, border-left-color 0.3s ease;
+            font-size: 1.1em;
+        }
+        .sidebar-nav a:hover, .sidebar-nav a.active {
+            background-color: var(--sidebar-active-bg);
+            transform: translateX(5px);
+            border-left: 5px solid var(--sidebar-active-border);
+        }
+        .main-content {
+            flex-grow: 1; 
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .header-main {
+            background-color: var(--header-main-bg);
+            padding: 15px 30px;
+            border-radius: 8px;
+            box-shadow: var(--header-main-shadow);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.1em;
+            color: var(--header-main-text);
+            transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
+        }
+        .header-main .welcome-message {
+            font-weight: bold;
+        }
+        .header-main .logout-button {
+            background-color: var(--button-danger-bg);
+            color: var(--button-text-color);
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.2s ease;
+        }
+        .header-main .logout-button:hover {
+            background-color: var(--button-danger-hover-bg);
+        }
+
+        .container { 
+            background-color: var(--container-bg); 
+            padding: 30px; 
+            border-radius: 12px; 
+            box-shadow: var(--container-shadow); 
+            max-width: 1000px; 
+            width: 100%; 
+            margin: 0 auto; 
+            animation: fadeIn 0.8s ease-out;
+            flex-grow: 1; 
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        h2 { 
+            color: var(--h2-color); 
+            border-bottom: 2px solid var(--h2-border-color); 
+            padding-bottom: 10px;
+            margin-top: 30px;
+            transition: color 0.3s, border-bottom-color 0.3s;
+        }
+        .flash-messages {
+            list-style: none;
+            padding: 10px 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border: 1px solid;
+            font-weight: bold;
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
+        .flash-messages li {
+            margin-bottom: 5px;
+        }
+        .flash-messages.success {
+            background-color: var(--flash-success-bg); color: var(--flash-success-text); border-color: var(--flash-success-border);
+        }
+        .flash-messages.error {
+            background-color: var(--flash-error-bg); color: var(--flash-error-text); border-color: var(--flash-error-border);
+        }
+        .flash-messages.warning {
+            background-color: var(--flash-warning-bg); color: var(--flash-warning-text); border-color: var(--flash-warning-border);
+        }
+        .flash-messages.info {
+            background-color: var(--flash-info-bg); color: var(--flash-info-text); border-color: var(--flash-info-border);
+        }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--text-color); }
+        .form-group input[type="text"], .form-group input[type="password"],
+        .form-group input[type="number"], .form-group select {
+            width: calc(100% - 22px); 
+            padding: 10px; 
+            border: 1px solid var(--input-border-color); 
+            background-color: var(--input-bg-color);
+            color: var(--input-text-color);
+            border-radius: 5px; 
+            font-size: 1em; 
+            box-sizing: border-box; 
+            transition: border-color 0.3s, background-color 0.3s, color 0.3s;
+        }
+        .form-group input[type="checkbox"] { margin-right: 10px; transform: scale(1.2); }
+        .button-group { display: flex; gap: 15px; margin-top: 30px; flex-wrap: wrap;}
+        .button { 
+            padding: 12px 20px; 
+            background-color: var(--button-primary-bg); 
+            color: var(--button-text-color); 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 1em; 
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            text-decoration: none; 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center;
+        }
+        .button:hover { background-color: var(--button-primary-hover-bg); transform: translateY(-2px);}
+        .button-secondary { background-color: var(--button-secondary-bg); }
+        .button-secondary:hover { background-color: var(--button-secondary-hover-bg); }
+        .button-config { background-color: var(--button-light-bg); } /* Was .button-config, now .button-light */
+        .button-config:hover { background-color: var(--button-light-hover-bg); }
+        .button-back { background-color: var(--button-light-bg); }
+        .button-back:hover { background-color: var(--button-light-hover-bg); }
+
+        .record-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .record-table th, .record-table td { 
+            border: 1px solid var(--table-border-color); 
+            padding: 10px; 
+            text-align: left; 
+            vertical-align: middle;
+            transition: border-color 0.3s;
+        }
+        .record-table th { 
+            background-color: var(--table-th-bg); 
+            font-weight: bold; 
+            color: var(--table-th-text); 
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .record-table tr:nth-child(even) { background-color: var(--table-row-even-bg); transition: background-color 0.3s;}
+        .record-table tr:hover { background-color: var(--table-row-hover-bg); transition: background-color 0.3s;}
+        .record-status-cell { font-size: 0.9em; color: var(--text-color); opacity: 0.8; white-space: nowrap; }
+        .record-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+        .record-actions .button { padding: 5px 10px; font-size: 0.85em; border-radius: 4px; }
+        
+        .button-edit { background-color: var(--button-warning-bg); color: var(--button-warning-text); }
+        .button-edit:hover { background-color: var(--button-warning-hover-bg); }
+        .button-delete { background-color: var(--button-danger-bg); }
+        .button-delete:hover { background-color: var(--button-danger-hover-bg); }
+        .button-toggle { background-color: var(--button-info-bg); }
+        .button-toggle-off { background-color: var(--button-light-bg); }
+        .button-toggle:hover { background-color: var(--button-info-hover-bg); }
+
+        .log-container { 
+            margin-top: 20px; padding: 15px; 
+            background-color: var(--log-container-bg); 
+            color: var(--log-container-text); 
+            border-radius: 8px; max-height: 450px; overflow-y: auto; 
+            font-family: 'Fira Code', 'Cascadia Code', monospace; font-size: 0.85em; 
+            border: 1px solid var(--log-border-color);
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+        }
+        .log-entry { padding: 4px 0; border-bottom: 1px dashed var(--log-border-color); white-space: pre-wrap; word-wrap: break-word; transition: border-bottom-color 0.3s;}
+        .log-entry:last-child { border-bottom: none; }
+        /* Log specific colors - these are semantic, so keep them distinct */
+        .log-entry.error { color: #ff8888; font-weight: bold; } 
+        .log-entry.warning { color: #ffd18a; } 
+        .log-entry.debug { color: #99aaff; } 
+    </style>
+</head>
+<body>
+    <button id="theme-toggle" class="theme-toggle-button" title="切换主题">🌙</button>
+
+    {% if session.logged_in %}
+    <div class="sidebar">
+        <h2>DDNS 控制台</h2>
+        <nav class="sidebar-nav">
+            <li><a href="{{ url_for('index') }}" id="nav-dashboard">状态总览</a></li>
+            <li><a href="{{ url_for('records_management') }}" id="nav-records">记录管理</a></li>
+            <li><a href="{{ url_for('settings') }}" id="nav-settings">全局设置</a></li>
+            <li><a href="{{ url_for('admin_settings') }}" id="nav-admin">管理员设置</a></li>
+        </nav>
+    </div>
+    {% endif %}
+
+    <div class="main-content">
+        {% if session.logged_in %}
+        <div class="header-main">
+            <span class="welcome-message">欢迎，{{ username }} ！</span>
+            <a href="{{ url_for('logout') }}" class="logout-button">登出</a>
+        </div>
+        {% endif %}
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flash-messages {{ messages[0][0] if messages[0] else '' }}">
+                    {% for category, message in messages %}
+                        <li>{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Navigation link highlighting
+            const currentPath = window.location.pathname;
+            const navLinks = document.querySelectorAll('.sidebar-nav a');
+            navLinks.forEach(link => {
+                if (link.getAttribute('href') === currentPath || 
+                    (currentPath.startsWith('/records/') && link.id === 'nav-records') ||
+                    (currentPath === '/' && link.id === 'nav-dashboard') ||
+                    (currentPath === '/settings' && link.id === 'nav-settings') ||
+                    (currentPath === '/admin_settings' && link.id === 'nav-admin')
+                ) {
+                    link.classList.add('active');
+                }
+            });
+
+            // Theme switcher logic
+            const themeToggleButton = document.getElementById('theme-toggle');
+            const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)');
+            let lastToggleTime = 0;
+
+            function applyTheme(theme) {
+                if (theme === 'dark') {
+                    document.body.setAttribute('data-theme', 'dark');
+                    themeToggleButton.textContent = '☀️'; // Sun icon for switching to light
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.body.removeAttribute('data-theme'); // Or set to 'light'
+                    themeToggleButton.textContent = '🌙'; // Moon icon for switching to dark
+                    localStorage.setItem('theme', 'light');
+                }
+            }
+
+            // Load saved theme or detect system preference
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                applyTheme(savedTheme);
+            } else {
+                applyTheme(prefersDarkScheme.matches ? 'dark' : 'light');
+            }
+
+            // Listen for system theme changes (if no manual override)
+            prefersDarkScheme.addEventListener('change', (e) => {
+                if (!localStorage.getItem('theme')) { // Only if user hasn't manually set a theme
+                    applyTheme(e.matches ? 'dark' : 'light');
+                }
+            });
+
+            // Button click handler
+            themeToggleButton.addEventListener('click', () => {
+                const now = Date.now();
+                if (now - lastToggleTime < 500) { // Throttle: 0.5 seconds
+                    return;
+                }
+                lastToggleTime = now;
+
+                const currentTheme = document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+                applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}{{ form_title }} - Cloudflare DDNS{% endblock %}
+
+{% block content %}
+    <h1>{{ form_title }} </h1>
+    
+    <form method="POST" action="">
+        <div class="form-group">
+            <label for="name">域名 (例如: home.yourdomain.com):</label>
+            <input type="text" id="name" name="name" value="{{ record.name if record else '' }}" required>
+        </div>
+        <div class="form-group">
+            <label for="type">记录类型:</label>
+            <select id="type" name="type" required>
+                <option value="A" {% if record and record.type == 'A' %}selected{% endif %}>A (IPv4)</option>
+                <option value="AAAA" {% if record and record.type == 'AAAA' %}selected{% endif %}>AAAA (IPv6)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="ttl">TTL (秒):</label>
+            <input type="number" id="ttl" name="ttl" value="{{ record.ttl if record else 120 }}" min="1" required>
+        </div>
+        <div class="form-group">
+            <input type="checkbox" id="proxied" name="proxied" {% if record and record.proxied %}checked{% endif %}>
+            <label for="proxied">启用 Cloudflare 代理 (小云朵)</label>
+        </div>
+        <div class="form-group">
+            <input type="checkbox" id="enabled" name="enabled" {% if record is none or record.enabled %}checked{% endif %}>
+            <label for="enabled">启用此记录的 DDNS 更新</label>
+        </div>
+        <div class="button-group">
+            <button type="submit" class="button">保存</button>
+            <a href="{{ url_for('records_management') }}" class="button button-back">取消并返回</a> {# 返回到记录管理页 #}
+        </div>
+    </form>
+{% endblock %}
