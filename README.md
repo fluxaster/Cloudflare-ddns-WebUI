@@ -13,16 +13,8 @@ Cloudflare-ddns-WebUI是一款基于 Python Flask 构建的轻量级动态域名
     *   IPv4: 通过多个公共 API 获取公网 IPv4 地址。
     *   IPv6: 通过本地 PowerShell 脚本 (Windows) 获取稳定的公网 IPv6 地址 (GUA)。
 *   **Cloudflare API**：使用 Cloudflare API v4 进行 DNS 记录的读取、创建和更新。
-*   **日志记录**：详细记录运行状态和错误信息，方便排查问题。
-*   **安全认证**：
-    *   管理员账户设置和密码保护。
-    *   密码使用 `werkzeug.security` 进行哈希存储。
-*   **配置持久化**：
-    *   全局设置 (如 API Token, Zone ID, 更新间隔) 保存于 `config.ini`。
-    *   DDNS 记录配置保存于 `records.json`。
-    *   管理员凭证保存于 `admin_credentials.json`。
-*   **主题切换**：支持亮色和暗色主题，自动检测系统偏好并可手动切换。
-*   **响应式设计**：界面适配不同设备尺寸（基础响应式）。
+
+![界面截图](https://github.com/fluxaster/Cloudflare-ddns-WebUI/blob/main/a.png)
 
 ## 快速开始
 
