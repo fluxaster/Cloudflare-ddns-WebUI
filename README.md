@@ -32,7 +32,7 @@ Cloudflare-ddns-WebUI是一款基于 Python Flask 构建的轻量级动态域名
     ```
 
 2.  **运行Webapp**:
-    或运行`start.bat`
+    可直接运行一键启动脚本`start.bat`
 
 4.  **访问控制面板**:
     打开浏览器，访问 `http://localhost:5000` (或您服务器的 IP 地址和端口)。
