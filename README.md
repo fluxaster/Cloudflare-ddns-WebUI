@@ -31,29 +31,7 @@ Cloudflare-ddns-WebUI是一款基于 Python Flask 构建的轻量级动态域名
     git clone https://github.com/fluxaster/Cloudflare-ddns-WebUI.git
     ```
 
-2.  **配置 Cloudflare API**:
-    *   您需要填入您的 Cloudflare API Token 和 Zone ID。
-    *   你也可以在WebUI中填入。
-        *   **API Token**: 从 Cloudflare 控制台创建，确保具有编辑 DNS 的权限。推荐使用区域限定的 API Token。
-        *   **Zone ID**: 在您的域名概览页面可以找到。
-    *   `config.ini` 示例内容:
-        ```ini
-        [Cloudflare]
-        ApiToken = YOUR_CLOUDFLARE_API_TOKEN
-        ZoneId = YOUR_CLOUDFLARE_ZONE_ID
-
-        [DDNS]
-        CheckIntervalMinutes = 5
-        EnableIPv4DDNS = True
-        EnableIPv6DDNS = True
-        InterfaceName = 
-        ```
-            
-3.  **安装依赖并运行应用**:
-    ```bash
-    pip install -r requirements.txt
-    python app.py
-    ```
+2.  **运行Webapp**:
     或运行`start.bat`
 
 4.  **访问控制面板**:
@@ -61,7 +39,10 @@ Cloudflare-ddns-WebUI是一款基于 Python Flask 构建的轻量级动态域名
 
 5.  **首次设置**:
     *   首次访问会引导您设置管理员账户的用户名和密码。
-    *   登录后，您可以在“全局设置”页面配置 Cloudflare API Token 和 Zone ID (如果 `config.ini` 未预先配置或配置有误)。
+    *   登录后，您可以在“全局设置”页面配置 Cloudflare API Token 和 Zone ID (也可在 `config.ini` 中配置)。
+       *   您需要填入您的 Cloudflare API Token 和 Zone ID。
+           *   **API Token**: 从 Cloudflare 控制台创建，确保具有编辑 DNS 的权限。推荐使用区域限定的 API Token。
+           *   **Zone ID**: 在您的域名概览页面可以找到。
     *   然后在“记录管理”页面添加您需要进行 DDNS 更新的域名记录。
 
 ## 文件结构
