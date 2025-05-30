@@ -1232,7 +1232,7 @@ if __name__ == '__main__':
         add_log_entry("DDNS 自动更新间隔设置为0或无效。", "WARNING")
     try:
         add_log_entry("启动 Flask Web 服务器...")
-        flask_app.run(host='::', port=8443, debug=False) 
+        flask_app.run(host='127.0.0.1', port=5000, debug=False) 
     except (KeyboardInterrupt, SystemExit):
         if 'scheduler' in globals() and scheduler.running:
             scheduler.shutdown()
