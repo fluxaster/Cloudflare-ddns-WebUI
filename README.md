@@ -13,16 +13,8 @@ Cloudflare-ddns-WebUI是一款基于 Python Flask 构建的轻量级动态域名
     *   IPv4: 通过多个公共 API 获取公网 IPv4 地址。
     *   IPv6: 通过本地 PowerShell 脚本 (Windows) 获取稳定的公网 IPv6 地址 (GUA)。
 *   **Cloudflare API**：使用 Cloudflare API v4 进行 DNS 记录的读取、创建和更新。
-*   **日志记录**：详细记录运行状态和错误信息，方便排查问题。
-*   **安全认证**：
-    *   管理员账户设置和密码保护。
-    *   密码使用 `werkzeug.security` 进行哈希存储。
-*   **配置持久化**：
-    *   全局设置 (如 API Token, Zone ID, 更新间隔) 保存于 `config.ini`。
-    *   DDNS 记录配置保存于 `records.json`。
-    *   管理员凭证保存于 `admin_credentials.json`。
-*   **主题切换**：支持亮色和暗色主题，自动检测系统偏好并可手动切换。
-*   **响应式设计**：界面适配不同设备尺寸（基础响应式）。
+
+![界面截图](https://github.com/fluxaster/Cloudflare-ddns-WebUI/blob/main/a.png)
 
 ## 快速开始
 
@@ -39,37 +31,18 @@ Cloudflare-ddns-WebUI是一款基于 Python Flask 构建的轻量级动态域名
     git clone https://github.com/fluxaster/Cloudflare-ddns-WebUI.git
     ```
 
-2.  **配置 Cloudflare API**:
-    *   您需要填入您的 Cloudflare API Token 和 Zone ID。
-    *   你也可以在WebUI中填入。
-        *   **API Token**: 从 Cloudflare 控制台创建，确保具有编辑 DNS 的权限。推荐使用区域限定的 API Token。
-        *   **Zone ID**: 在您的域名概览页面可以找到。
-    *   `config.ini` 示例内容:
-        ```ini
-        [Cloudflare]
-        ApiToken = YOUR_CLOUDFLARE_API_TOKEN
-        ZoneId = YOUR_CLOUDFLARE_ZONE_ID
-
-        [DDNS]
-        CheckIntervalMinutes = 5
-        EnableIPv4DDNS = True
-        EnableIPv6DDNS = True
-        InterfaceName = 
-        ```
-            
-3.  **安装依赖并运行应用**:
-    ```bash
-    pip install -r requirements.txt
-    python app.py
-    ```
-    或运行`start.bat`
+2.  **运行Webapp**:
+    可直接运行一键启动脚本`start.bat`
 
 4.  **访问控制面板**:
     打开浏览器，访问 `http://localhost:5000` (或您服务器的 IP 地址和端口)。
 
 5.  **首次设置**:
     *   首次访问会引导您设置管理员账户的用户名和密码。
-    *   登录后，您可以在“全局设置”页面配置 Cloudflare API Token 和 Zone ID (如果 `config.ini` 未预先配置或配置有误)。
+    *   登录后，您可以在“全局设置”页面配置 Cloudflare API Token 和 Zone ID (也可在 `config.ini` 中配置)。
+       *   您需要填入您的 Cloudflare API Token 和 Zone ID。
+           *   **API Token**: 从 Cloudflare 控制台创建，确保具有编辑 DNS 的权限。推荐使用区域限定的 API Token。
+           *   **Zone ID**: 在您的域名概览页面可以找到。
     *   然后在“记录管理”页面添加您需要进行 DDNS 更新的域名记录。
 
 ## 文件结构
