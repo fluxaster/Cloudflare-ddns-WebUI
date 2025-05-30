@@ -12,7 +12,8 @@ Cloudflare-ddns-WebUI是一款基于 Python Flask 构建的轻量级动态域名
 *   **IP 地址获取**：
     *   IPv4: 通过多个公共 API 获取公网 IPv4 地址。
     *   IPv6: 通过本地 PowerShell 脚本 (Windows) 获取稳定的公网 IPv6 地址 (GUA)。
-*   **Cloudflare API**：使用 Cloudflare API v4 进行 DNS 记录的读取、创建和更新。
+*   **自动配置端口转发**: 通过api自动创建和删除Origin Rule端口转发记录。
+*   **Cloudflare API**：使用 Cloudflare API v4 进行 DNS/Origin Rule 记录的读取、创建和更新。
 
 ![界面截图](https://github.com/fluxaster/Cloudflare-ddns-WebUI/blob/main/a.png)
 
@@ -26,18 +27,22 @@ Cloudflare-ddns-WebUI是一款基于 Python Flask 构建的轻量级动态域名
 
 ### 安装步骤
 
-1.  **克隆仓库或下载压缩包**:
+1.  **获取API Token和Zone ID**:
+    *   登录cloudflare主界面-点击目标域名-概述-保存Zone ID(区域ID)-点击获取api令牌-使用编辑区域DNS模板-可参考下图配置令牌权限
+        ![令牌权限参考](https://github.com/fluxaster/Cloudflare-ddns-WebUI/blob/main/b.png)
+
+3.  **克隆仓库或下载压缩包**:
     ```bash
     git clone https://github.com/fluxaster/Cloudflare-ddns-WebUI.git
     ```
 
-2.  **运行Webapp**:
+4.  **运行Webapp**:
     可直接运行一键启动脚本`start.bat`
 
-4.  **访问控制面板**:
-    打开浏览器，访问 `http://localhost:5000` (或您服务器的 IP 地址和端口)。
+5.  **访问控制面板**:
+    打开浏览器，访问 `http://127.0.0.1:5000` (或您服务器的 IP 地址和端口)。
 
-5.  **首次设置**:
+6.  **首次设置**:
     *   首次访问会引导您设置管理员账户的用户名和密码。
     *   登录后，您可以在“全局设置”页面配置 Cloudflare API Token 和 Zone ID (也可在 `config.ini` 中配置)。
        *   您需要填入您的 Cloudflare API Token 和 Zone ID。
