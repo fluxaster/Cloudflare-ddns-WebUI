@@ -1,51 +1,77 @@
 {% extends "base.html" %}
 
-{% block title %}管理员账户与API设置 - Cloudflare DDNS{% endblock %}
+{% block title %}管理员与API设置 - Cloudflare DDNS{% endblock %}
 
 {% block content %}
-    <h1>管理员账户设置</h1>
-    
-    <form method="POST" action="{{ url_for('admin_settings') }}">
-        <input type="hidden" name="form_type" value="password_change"> {# 用于区分表单提交类型 #}
-        <h2>修改密码</h2>
-        <div class="form-group">
-            <label for="old_password">当前密码:</label>
-            <input type="password" id="old_password" name="old_password" autocomplete="current-password">
-        </div>
-        <div class="form-group">
-            <label for="new_password">新密码 (留空则不修改):</label>
-            <input type="password" id="new_password" name="new_password" autocomplete="new-password">
-        </div>
-        <div class="form-group">
-            <label for="confirm_new_password">确认新密码:</label>
-            <input type="password" id="confirm_new_password" name="confirm_new_password" autocomplete="new-password">
-        </div>
-        <div class="button-group">
-            <button type="submit" class="button">保存密码更改</button>
-        </div>
-    </form>
+    <h1 class="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-8">管理员账户与 API 设置</h1>
 
-    <hr style="margin: 40px 0;">
+    <div class="space-y-10">
+        <section>
+            <form method="POST" action="{{ url_for('admin_settings') }}" class="space-y-6">
+                <input type="hidden" name="form_type" value="password_change">
+                <div>
+                    <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-1">修改密码</h2>
+                    <p class="text-sm text-[var(--text-secondary)] mb-4">定期更新您的密码以增强安全性。</p>
+                </div>
 
-    <h1>Cloudflare API 设置</h1>
-    <p style="color: var(--text-color); opacity: 0.8;">
-        修改这些设置将直接影响 DDNS 功能。请确保您输入的 API Token 和 Zone ID 正确无误。
-        API Token 推荐使用具有特定区域 DNS 编辑权限的 Token。
-    </p>
-    <form method="POST" action="{{ url_for('admin_settings') }}">
-        <input type="hidden" name="form_type" value="api_config_change"> {# 用于区分表单提交类型 #}
-        <h2>配置 Cloudflare API</h2>
-        <div class="form-group">
-            <label for="cf_api_token">Cloudflare API Token:</label>
-            <input type="password" id="cf_api_token" name="cf_api_token" value="{{ current_config.CF_API_TOKEN }}" required autocomplete="off">
-            <small>输入新 Token 以更新，当前 Token 已部分隐藏。</small>
-        </div>
-        <div class="form-group">
-            <label for="cf_zone_id">Cloudflare Zone ID:</label>
-            <input type="text" id="cf_zone_id" name="cf_zone_id" value="{{ current_config.CF_ZONE_ID }}" required autocomplete="off">
-        </div>
-        <div class="button-group">
-            <button type="submit" class="button button-secondary">保存 API 设置</button>
-        </div>
-    </form>
-{% endblock %}  
+                <div>
+                    <label for="old_password" class="block text-sm font-medium text-[var(--text-secondary)]">当前密码</label>
+                    <input type="password" id="old_password" name="old_password" autocomplete="current-password"
+                           class="form-input mt-1 block w-full md:w-2/3 lg:w-1/2 rounded-md shadow-sm sm:text-sm">
+                </div>
+
+                <div>
+                    <label for="new_password" class="block text-sm font-medium text-[var(--text-secondary)]">新密码 (留空则不修改)</label>
+                    <input type="password" id="new_password" name="new_password" autocomplete="new-password"
+                           class="form-input mt-1 block w-full md:w-2/3 lg:w-1/2 rounded-md shadow-sm sm:text-sm">
+                </div>
+
+                <div>
+                    <label for="confirm_new_password" class="block text-sm font-medium text-[var(--text-secondary)]">确认新密码</label>
+                    <input type="password" id="confirm_new_password" name="confirm_new_password" autocomplete="new-password"
+                           class="form-input mt-1 block w-full md:w-2/3 lg:w-1/2 rounded-md shadow-sm sm:text-sm">
+                </div>
+                
+                <div class="pt-2">
+                    <button type="submit" class="btn inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)]">
+                        保存密码更改
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <hr class="border-[var(--border-color)]">
+
+        <section>
+            <form method="POST" action="{{ url_for('admin_settings') }}" class="space-y-6">
+                <input type="hidden" name="form_type" value="api_config_change">
+                <div>
+                    <h2 class="text-xl font-semibold text-[var(--text-primary)] mb-1">Cloudflare API 设置</h2>
+                    <p class="text-sm text-[var(--text-secondary)] mb-4">
+                        修改这些设置将直接影响 DDNS 功能。请确保您输入的 API Token 和 Zone ID 正确无误。
+                        API Token 推荐使用具有特定区域 DNS 编辑权限的 Token。
+                    </p>
+                </div>
+
+                <div>
+                    <label for="cf_api_token" class="block text-sm font-medium text-[var(--text-secondary)]">Cloudflare API Token</label>
+                    <input type="password" id="cf_api_token" name="cf_api_token" value="{{ current_config.CF_API_TOKEN }}" required autocomplete="off"
+                           class="form-input mt-1 block w-full md:w-2/3 lg:w-1/2 rounded-md shadow-sm sm:text-sm">
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">输入新 Token 以更新，当前 Token 已部分隐藏以保护安全。</p>
+                </div>
+
+                <div>
+                    <label for="cf_zone_id" class="block text-sm font-medium text-[var(--text-secondary)]">Cloudflare Zone ID</label>
+                    <input type="text" id="cf_zone_id" name="cf_zone_id" value="{{ current_config.CF_ZONE_ID }}" required autocomplete="off"
+                           class="form-input mt-1 block w-full md:w-2/3 lg:w-1/2 rounded-md shadow-sm sm:text-sm">
+                </div>
+
+                <div class="pt-2">
+                    <button type="submit" class="btn btn-secondary inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        保存 API 设置
+                    </button>
+                </div>
+            </form>
+        </section>
+    </div>
+{% endblock %}

@@ -3,26 +3,58 @@
 {% block title %}全局设置 - Cloudflare DDNS{% endblock %}
 
 {% block content %}
-    <h1>Cloudflare DDNS 全局设置 </h1>
+    <h1 class="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-6">Cloudflare DDNS 全局设置</h1>
     
-    <form method="POST" action="{{ url_for('settings') }}">
-        <div class="form-group">
-            <label for="interval">DDNS 自动检查间隔 (分钟):</label>
-            <input type="number" id="interval" name="interval" value="{{ config.DDNS_CHECK_INTERVAL_MINUTES }}" min="1" required>
+    <form method="POST" action="{{ url_for('settings') }}" class="space-y-8">
+        <div>
+            <label for="interval" class="block text-sm font-medium text-[var(--text-secondary)]">DDNS 自动检查间隔 (分钟)</label>
+            <div class="mt-1">
+                <input type="number" id="interval" name="interval" value="{{ config.DDNS_CHECK_INTERVAL_MINUTES }}" min="1" required
+                       class="form-input appearance-none block w-full md:w-1/2 lg:w-1/3 px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] sm:text-sm">
+            </div>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">设置 DDNS 服务检查 IP 地址变化的频率。</p>
         </div>
-        <div class="form-group">
-            <label>DDNS 功能开关:</label><br>
-            <input type="checkbox" id="enable_ipv4" name="enable_ipv4" {% if config.ENABLE_IPV4_DDNS %}checked{% endif %}>
-            <label for="enable_ipv4">启用 IPv4 DDNS</label><br>
-            <input type="checkbox" id="enable_ipv6" name="enable_ipv6" {% if config.ENABLE_IPV6_DDNS %}checked{% endif %}>
-            <label for="enable_ipv6">启用 IPv6 DDNS</label>
+
+        <fieldset>
+            <legend class="text-sm font-medium text-[var(--text-secondary)]">DDNS 功能开关</legend>
+            <div class="mt-2 space-y-2">
+                <div class="relative flex items-start">
+                    <div class="flex items-center h-5">
+                        <input id="enable_ipv4" name="enable_ipv4" type="checkbox" {% if config.ENABLE_IPV4_DDNS %}checked{% endif %}
+                               class="form-checkbox h-4 w-4 text-[var(--accent-color)] border-gray-300 rounded focus:ring-[var(--accent-color)]">
+                    </div>
+                    <div class="ml-3 text-sm">
+                        <label for="enable_ipv4" class="font-medium text-[var(--text-secondary)]">启用 IPv4 DDNS</label>
+                    </div>
+                </div>
+                <div class="relative flex items-start">
+                    <div class="flex items-center h-5">
+                        <input id="enable_ipv6" name="enable_ipv6" type="checkbox" {% if config.ENABLE_IPV6_DDNS %}checked{% endif %}
+                               class="form-checkbox h-4 w-4 text-[var(--accent-color)] border-gray-300 rounded focus:ring-[var(--accent-color)]">
+                    </div>
+                    <div class="ml-3 text-sm">
+                        <label for="enable_ipv6" class="font-medium text-[var(--text-secondary)]">启用 IPv6 DDNS</label>
+                    </div>
+                </div>
+            </div>
+        </fieldset>
+
+        <div>
+            <label for="interface_name" class="block text-sm font-medium text-[var(--text-secondary)]">指定 IPv6 网络接口名 (可选)</label>
+            <div class="mt-1">
+                <input type="text" id="interface_name" name="interface_name" value="{{ config.DDNS_INTERFACE_NAME }}" placeholder="例如：以太网"
+                       class="form-input appearance-none block w-full md:w-1/2 lg:w-1/3 px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] sm:text-sm">
+            </div>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">用于高级 IPv6 地址获取。如果留空，系统将尝试自动检测。</p>
         </div>
-        <div class="form-group">
-            <label for="interface_name">指定 IPv6 网络接口名 (可选，用于高级IPv6获取):</label>
-            <input type="text" id="interface_name" name="interface_name" value="{{ config.DDNS_INTERFACE_NAME }}" placeholder="例如：以太网">
-        </div>
-        <div class="button-group">
-            <button type="submit" class="button">保存设置</button>
+        
+        <div class="pt-5">
+            <div class="flex justify-end">
+                <button type="submit"
+                        class="btn ml-3 inline-flex justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)]">
+                    保存设置
+                </button>
+            </div>
         </div>
     </form>
 {% endblock %}

@@ -3,35 +3,125 @@
 {% block title %}{{ form_title }} - Cloudflare DDNS{% endblock %}
 
 {% block content %}
-    <h1>{{ form_title }} </h1>
+    <h1 class="text-2xl md:text-3xl font-bold text-[var(--text-primary)] mb-6">{{ form_title }}</h1>
     
-    <form method="POST" action="">
-        <div class="form-group">
-            <label for="name">域名 (例如: home.yourdomain.com):</label>
-            <input type="text" id="name" name="name" value="{{ record.name if record else '' }}" required>
+    <form method="POST" action="" class="space-y-6">
+        <div>
+            <label for="name" class="block text-sm font-medium text-[var(--text-secondary)]">域名 (例如: home.yourdomain.com)</label>
+            <div class="mt-1">
+                <input type="text" id="name" name="name" value="{{ record.name if record else '' }}" required
+                       class="form-input appearance-none block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] sm:text-sm">
+            </div>
         </div>
-        <div class="form-group">
-            <label for="type">记录类型:</label>
-            <select id="type" name="type" required>
-                <option value="A" {% if record and record.type == 'A' %}selected{% endif %}>A (IPv4)</option>
-                <option value="AAAA" {% if record and record.type == 'AAAA' %}selected{% endif %}>AAAA (IPv6)</option>
-            </select>
+
+        <div>
+            <label for="type" class="block text-sm font-medium text-[var(--text-secondary)]">记录类型</label>
+            <div class="mt-1">
+                <select id="type" name="type" required {% if record and record.id %}disabled{% endif %}
+                        class="form-select block w-full pl-3 pr-10 py-2 text-base border-[var(--border-color)] focus:outline-none focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] sm:text-sm rounded-md {% if record and record.id %}bg-gray-100 dark:bg-gray-700 cursor-not-allowed{% endif %}">
+                    <option value="A" {% if record and record.type == 'A' %}selected{% endif %}>A (IPv4)</option>
+                    <option value="AAAA" {% if record and record.type == 'AAAA' %}selected{% endif %}>AAAA (IPv6)</option>
+                </select>
+                {% if record and record.id %}
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">记录类型在创建后不可修改。</p>
+                <input type="hidden" name="type" value="{{ record.type }}">
+                {% endif %}
+            </div>
         </div>
-        <div class="form-group">
-            <label for="ttl">TTL (秒):</label>
-            <input type="number" id="ttl" name="ttl" value="{{ record.ttl if record else 120 }}" min="1" required>
+
+        <div>
+            <label for="ttl" class="block text-sm font-medium text-[var(--text-secondary)]">TTL (秒)</label>
+            <div class="mt-1">
+                <input type="number" id="ttl" name="ttl" value="{{ record.ttl if record else 120 }}" min="1" required
+                       class="form-input appearance-none block w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[var(--accent-color)] focus:border-[var(--accent-color)] sm:text-sm">
+            </div>
         </div>
-        <div class="form-group">
-            <input type="checkbox" id="proxied" name="proxied" {% if record and record.proxied %}checked{% endif %}>
-            <label for="proxied">启用 Cloudflare 代理 (小云朵)</label>
-        </div>
-        <div class="form-group">
-            <input type="checkbox" id="enabled" name="enabled" {% if record is none or record.enabled %}checked{% endif %}>
-            <label for="enabled">启用此记录的 DDNS 更新</label>
-        </div>
-        <div class="button-group">
-            <button type="submit" class="button">保存</button>
-            <a href="{{ url_for('records_management') }}" class="button button-back">取消并返回</a> {# 返回到记录管理页 #}
+
+        <fieldset class="space-y-2">
+            <legend class="text-base font-medium text-[var(--text-primary)] sr-only">DNS 记录选项</legend>
+            <div class="relative flex items-start">
+                <div class="flex items-center h-5">
+                    <input id="proxied" name="proxied" type="checkbox" {% if record and record.proxied %}checked{% endif %}
+                           class="form-checkbox h-4 w-4 text-[var(--accent-color)] border-gray-300 rounded focus:ring-[var(--accent-color)]">
+                </div>
+                <div class="ml-3 text-sm">
+                    <label for="proxied" class="font-medium text-[var(--text-secondary)]">启用 Cloudflare 代理 (橙色云朵)</label>
+                </div>
+            </div>
+            <div class="relative flex items-start">
+                <div class="flex items-center h-5">
+                    <input id="enabled" name="enabled" type="checkbox" {% if record is none or record.enabled %}checked{% endif %}
+                           class="form-checkbox h-4 w-4 text-[var(--accent-color)] border-gray-300 rounded focus:ring-[var(--accent-color)]">
+                </div>
+                <div class="ml-3 text-sm">
+                    <label for="enabled" class="font-medium text-[var(--text-secondary)]">启用此记录的 DDNS 更新</label>
+                </div>
+            </div>
+        </fieldset>
+
+        <hr class="border-[var(--border-color)]">
+
+        <fieldset class="space-y-4">
+            <legend class="text-lg font-semibold text-[var(--text-primary)] mb-2">端口转发 (Cloudflare Origin Rule)</legend>
+            <div class="relative flex items-start">
+                <div class="flex items-center h-5">
+                    <input id="origin_rule_enabled" name="origin_rule_enabled" type="checkbox" 
+                           {% if record and record.origin_rule_enabled %}checked{% endif %}
+                           onchange="toggleOriginRuleFields()"
+                           class="form-checkbox h-4 w-4 text-[var(--accent-color)] border-gray-300 rounded focus:ring-[var(--accent-color)]">
+                </div>
+                <div class="ml-3 text-sm">
+                    <label for="origin_rule_enabled" class="font-medium text-[var(--text-secondary)]">启用端口转发</label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">通过 Cloudflare Origin Rule 将对此域名的访问转发到指定的内部服务端口 (通常用于HTTPS)。</p>
+                </div>
+            </div>
+
+            <div id="origin_rule_fields_container" class="space-y-4 pl-7 {% if not (record and record.origin_rule_enabled) %}hidden{% endif %}">
+                <div>
+                    <label for="origin_rule_destination_port" class="block text-sm font-medium text-[var(--text-secondary)]">内部端口</label>
+                    <input type="number" id="origin_rule_destination_port" name="origin_rule_destination_port" 
+                           value="{{ record.origin_rule_destination_port if record and record.origin_rule_destination_port is not none else '' }}" min="1" max="65535"
+                           placeholder="例如: 80 (您内部服务实际监听的端口)"
+                           class="form-input mt-1 block w-full md:w-2/3 lg:w-1/2 rounded-md shadow-sm sm:text-sm">
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        流量将被转发到您源服务器上的这个端口<br>
+                        注意!Cloudflare免费版仅支持以下端口:<br>
+                        HTTP: 80, 8080, 8880, 2052, 2082, 2086, 2095<br>
+                        HTTPS: 443, 8443, 2053, 2083, 2087, 2096</p>
+                </div>
+            </div>
+        </fieldset>
+
+        <div class="flex flex-col sm:flex-row sm:justify-end sm:space-x-3 pt-4">
+            <a href="{{ url_for('records_management') }}" 
+               class="btn btn-secondary w-full sm:w-auto inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 mb-2 sm:mb-0">
+               取消并返回
+            </a>
+            <button type="submit"
+                    class="btn w-full sm:w-auto inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-color)]">
+                保存记录
+            </button>
         </div>
     </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleOriginRuleFields() {
+        const enabledCheckbox = document.getElementById('origin_rule_enabled');
+        const fieldsContainer = document.getElementById('origin_rule_fields_container');
+        const destPortInput = document.getElementById('origin_rule_destination_port');
+
+        if (enabledCheckbox.checked) {
+            fieldsContainer.classList.remove('hidden');
+            destPortInput.required = true;
+        } else {
+            fieldsContainer.classList.add('hidden');
+            destPortInput.required = false;
+            // destPortInput.value = ''; // Optionally clear value when hiding
+        }
+    }
+    // Call on page load to set initial state
+    document.addEventListener('DOMContentLoaded', toggleOriginRuleFields);
+</script>
 {% endblock %}
