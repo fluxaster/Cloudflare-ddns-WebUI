@@ -48,8 +48,6 @@ def add_log_entry(message, level="INFO"):
     else:
         logger.info(message)
     
-    # app_status["log_history"] is a list, insert is thread-safe enough for this use case (GIL)
-    # If it were more complex, APP_STATUS_LOCK might be used.
     app_status["log_history"].insert(0, entry)
     if len(app_status["log_history"]) > MAX_LOG_HISTORY:
         app_status["log_history"] = app_status["log_history"][:MAX_LOG_HISTORY]
@@ -68,30 +66,54 @@ DDNS_RECORDS = []
 
 # --- 管理员账户相关 ---
 ADMIN_CREDENTIALS_FILE = 'admin_credentials.json'
-ADMIN_ACCOUNT_SET = False
+ADMIN_ACCOUNT_SET = False # 初始化为 False
 
 def load_admin_credentials():
     global ADMIN_ACCOUNT_SET
     with ADMIN_CREDENTIALS_LOCK:
+        # Check if the admin credentials file exists
         if os.path.exists(ADMIN_CREDENTIALS_FILE):
             try:
+                # Try to open and read the credentials file
                 with open(ADMIN_CREDENTIALS_FILE, 'r', encoding='utf-8') as f:
                     creds = json.load(f)
-                    if creds and "username" in creds and "password_hash" in creds:
-                        ADMIN_ACCOUNT_SET = True
+                
+                # Validate the loaded credentials
+                if creds and "username" in creds and "password_hash" in creds:
+                    # ****** THE KEY CHANGE IS HERE ******
+                    # Only log "管理员账户已加载。" if ADMIN_ACCOUNT_SET was previously False.
+                    # This prevents repeated logging on subsequent successful loads.
+                    if not ADMIN_ACCOUNT_SET: 
                         add_log_entry("管理员账户已加载。", "INFO")
-                        return creds
+                    ADMIN_ACCOUNT_SET = True # Mark that admin account is now set
+                    return creds # Return the loaded credentials
+                else:
+                    # Credentials file exists but content is invalid
+                    if ADMIN_ACCOUNT_SET: # If it was considered set, log the change in status
+                        add_log_entry("管理员凭证文件内容无效，账户状态已重置。", "ERROR")
+                    ADMIN_ACCOUNT_SET = False # Mark as not set due to invalid content
             except json.JSONDecodeError as e:
+                # Error parsing the JSON content of the credentials file
                 add_log_entry(f"解析管理员凭证文件出错: {e}", "ERROR")
+                if ADMIN_ACCOUNT_SET: # If it was considered set, log the change in status
+                     add_log_entry("管理员账户因解析错误加载失败，状态已重置。", "ERROR")
+                ADMIN_ACCOUNT_SET = False # Mark as not set due to parsing error
             except Exception as e:
+                # Other errors while reading the credentials file
                 add_log_entry(f"读取管理员凭证文件时发生未知错误: {e}", "ERROR")
-        ADMIN_ACCOUNT_SET = False
-        if not os.path.exists(ADMIN_CREDENTIALS_FILE): # Only log not set if file truly doesn't exist
-             add_log_entry("管理员账户未设置。", "WARNING")
-        else: # Log failure if file exists but couldn't load
-             add_log_entry("管理员账户加载失败。", "WARNING")
+                if ADMIN_ACCOUNT_SET: # If it was considered set, log the change in status
+                    add_log_entry("管理员账户因读取错误加载失败，状态已重置。", "ERROR")
+                ADMIN_ACCOUNT_SET = False # Mark as not set due to other read error
+        else:
+            # Admin credentials file does not exist
+            if ADMIN_ACCOUNT_SET: # If it was considered set but the file is now gone
+                add_log_entry("管理员凭证文件不存在，账户状态已重置。", "WARNING")
+            ADMIN_ACCOUNT_SET = False # Mark as not set because file is missing
+            # The initial "管理员账户未设置。" log if the file is missing at startup
+            # is now intended to be handled by a check in `load_all_config`
+            # after this function is called, to avoid repetition here.
 
-        return None
+        return None # Return None if admin account is not successfully loaded
 
 def save_admin_credentials(username, password_hash):
     global ADMIN_ACCOUNT_SET
@@ -100,7 +122,7 @@ def save_admin_credentials(username, password_hash):
             with open(ADMIN_CREDENTIALS_FILE, 'w', encoding='utf-8') as f:
                 json.dump({"username": username, "password_hash": password_hash}, f, indent=4, ensure_ascii=False)
             add_log_entry("管理员账户已成功保存。", "INFO")
-            ADMIN_ACCOUNT_SET = True
+            ADMIN_ACCOUNT_SET = True # Ensure this is set after successful save
             return True
         except Exception as e:
             add_log_entry(f"保存管理员凭证失败: {e}", "ERROR")
@@ -124,7 +146,6 @@ def ensure_record_fields(record):
 def save_ddns_records():
     records_file_path = 'records.json'
     with DDNS_RECORDS_LOCK:
-        # Create a list of records to save from the current DDNS_RECORDS state
         records_to_save = [ensure_record_fields(dict(r)) for r in DDNS_RECORDS]
     try:
         with open(records_file_path, 'w', encoding='utf-8') as f:
@@ -138,7 +159,7 @@ def save_global_config():
     config_file_path = 'config.ini'
     cfg = configparser.ConfigParser()
     
-    with GLOBAL_CONFIG_LOCK: # Read GLOBAL_CONFIG under lock
+    with GLOBAL_CONFIG_LOCK:
         current_global_config_copy = GLOBAL_CONFIG.copy()
 
     if os.path.exists(config_file_path):
@@ -167,16 +188,13 @@ def save_global_config():
 def _sync_app_status_records_display():
     new_records_status = []
     
-    with DDNS_RECORDS_LOCK: # Read DDNS_RECORDS under lock
-        # Make a deep copy to work with outside the lock if processing is long,
-        # or keep processing short and do it inside the lock for simplicity.
-        # Here, copying and then processing is safer.
+    with DDNS_RECORDS_LOCK: 
         current_ddns_records_copy = [ensure_record_fields(dict(r)) for r in DDNS_RECORDS]
 
-    with APP_STATUS_LOCK: # Lock for reading old app_status["records_status"]
+    with APP_STATUS_LOCK: 
         old_records_status_map = {rs["id"]: rs for rs in app_status.get("records_status", [])}
 
-    for record_conf in current_ddns_records_copy: # Iterate over the copy
+    for record_conf in current_ddns_records_copy: 
         record_id = record_conf["id"]
         current_record_status = {
             "id": record_id, "name": record_conf["name"], "type": record_conf["type"],
@@ -212,14 +230,13 @@ def _sync_app_status_records_display():
              current_record_status["message"] = "已启用，待检查..."
         new_records_status.append(current_record_status)
     
-    with APP_STATUS_LOCK: # Lock for writing to app_status["records_status"]
+    with APP_STATUS_LOCK: 
         app_status["records_status"] = new_records_status
     add_log_entry("已同步应用状态中的记录显示信息。", "DEBUG")
 
 
 def load_all_config():
-    # Temporary local vars to hold config read from files
-    local_global_config = GLOBAL_CONFIG.copy() # Start with defaults
+    local_global_config = GLOBAL_CONFIG.copy() 
     local_ddns_records = []
 
     config = configparser.ConfigParser()
@@ -241,7 +258,7 @@ def load_all_config():
     else:
         add_log_entry("config.ini 文件未找到。将使用默认值。", "WARNING")
 
-    with GLOBAL_CONFIG_LOCK: # Update actual GLOBAL_CONFIG
+    with GLOBAL_CONFIG_LOCK: 
         GLOBAL_CONFIG.update(local_global_config)
 
     records_file_path = 'records.json'
@@ -268,37 +285,40 @@ def load_all_config():
     else:
         add_log_entry(f"records.json 文件未找到。将以空记录列表启动。", "WARNING")
     
-    with DDNS_RECORDS_LOCK: # Update actual DDNS_RECORDS
+    with DDNS_RECORDS_LOCK: 
         DDNS_RECORDS[:] = local_ddns_records
 
     if needs_save_due_to_schema_change:
         add_log_entry("检测到旧的 'origin_rule_cloudflare_port' 字段，已移除并准备重新保存 records.json。", "INFO")
-        save_ddns_records() # This will acquire DDNS_RECORDS_LOCK internally
+        save_ddns_records() 
 
-    load_admin_credentials() # Handles its own lock
+    # Load admin credentials (this will set ADMIN_ACCOUNT_SET global variable)
+    load_admin_credentials() 
 
-    with GLOBAL_CONFIG_LOCK: # Read for logging and final checks
+    # Check ADMIN_ACCOUNT_SET status after the attempt to load credentials
+    with ADMIN_CREDENTIALS_LOCK:
+        if not ADMIN_ACCOUNT_SET:
+            if not os.path.exists(ADMIN_CREDENTIALS_FILE):
+                add_log_entry(f"管理员账户未设置 (凭证文件 '{ADMIN_CREDENTIALS_FILE}' 未找到)。", "WARNING")
+            # If file exists but ADMIN_ACCOUNT_SET is False, load_admin_credentials would have logged specific errors.
+
+    with GLOBAL_CONFIG_LOCK: 
         if not GLOBAL_CONFIG["CF_API_TOKEN"] or not GLOBAL_CONFIG["CF_ZONE_ID"]:
             add_log_entry("警告: Cloudflare API Token 或 Zone ID 未能成功加载。DDNS 功能将无法正常工作。", "ERROR")
-            # Do not clear them here if they were partially set, let user fix via UI.
         add_log_entry(f"最终加载的 Cloudflare API Token (部分显示): {GLOBAL_CONFIG['CF_API_TOKEN'][:8]}...", "DEBUG")
         add_log_entry(f"最终加载的 Cloudflare Zone ID: {GLOBAL_CONFIG['CF_ZONE_ID']}", "DEBUG")
 
-    _sync_app_status_records_display() # Handles its own locks
+    _sync_app_status_records_display()
 
 
 # --- DDNS 核心功能 ---
-def get_stable_ipv6_windows(interface_name_from_config): # Pass interface name
+def get_stable_ipv6_windows(interface_name_from_config):
     script_path = os.path.join(os.path.dirname(__file__), "get_ipv6.ps1")
     if not os.path.exists(script_path):
         add_log_entry("错误: get_ipv6.ps1 脚本未找到!", "ERROR")
         return None
     command = ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", script_path]
-    # If your script accepts an interface name argument:
-    # if interface_name_from_config:
-    #    command.extend(["-InterfaceName", interface_name_from_config]) # Example
-    #    add_log_entry(f"将使用配置的网络接口名: {interface_name_from_config} 调用脚本。", "DEBUG")
-
+    
     add_log_entry(f"执行 PowerShell 命令: {' '.join(command)}", "DEBUG")
     try:
         process = subprocess.run(command, capture_output=True, text=True, check=False, encoding='utf-8', timeout=15)
@@ -363,9 +383,8 @@ def get_public_ipv4():
 
 CLOUDFLARE_API_BASE_URL = "https://api.cloudflare.com/client/v4"
 
-def _cf_api_request(method, endpoint, api_token, data=None, params=None): # Added api_token
-    if not api_token : # Zone ID is part of endpoint usually, token is essential
-        # This check is now more for completeness, as higher levels should ensure token is present
+def _cf_api_request(method, endpoint, api_token, data=None, params=None): 
+    if not api_token : 
         add_log_entry("Cloudflare API Token 未提供给 _cf_api_request。", "ERROR")
         return {"success": False, "errors": [{"message": "API Token not provided to request function."}]}
 
@@ -390,16 +409,15 @@ def _cf_api_request(method, endpoint, api_token, data=None, params=None): # Adde
                 error_message += f" - API 错误详情 (非JSON): {detailed_error_content}"
         add_log_entry(error_message, "ERROR")
         
-        # Construct a consistent error response
         errors_list = []
         if isinstance(detailed_error_content, dict) and "errors" in detailed_error_content:
             errors_list = detailed_error_content["errors"]
-        elif isinstance(detailed_error_content, list): # if error content itself is a list of errors
+        elif isinstance(detailed_error_content, list): 
              errors_list = detailed_error_content
-        elif detailed_error_content: # string or other non-empty
+        elif detailed_error_content: 
             errors_list = [{"message": str(detailed_error_content)}]
         else:
-            errors_list = [{"message": str(e)}] # Fallback to the exception string
+            errors_list = [{"message": str(e)}] 
         return {"success": False, "errors": errors_list}
 
 
@@ -408,17 +426,16 @@ def _get_cloudflare_dns_record(zone_id, api_token, record_name, record_type):
     params = {"type": record_type, "name": record_name}
     data = _cf_api_request("GET", endpoint, api_token, params=params)
     if data and data.get("success"):
-        if data["result"]: # result is a list of records
+        if data["result"]: 
             record = data["result"][0]
             add_log_entry(f"Cloudflare 记录 '{record_name}' ({record_type}) 当前 IP: {record['content']}, ID: {record['id']}, Proxied: {record.get('proxied', False)}", "DEBUG")
-            return record # Return the first record found
+            return record 
         else:
             add_log_entry(f"在 Cloudflare 上未找到名为 '{record_name}' 的 {record_type} 记录。", "INFO")
-            return None # Explicitly None if not found but API call was successful
+            return None 
     else:
-        # Error already logged by _cf_api_request
         add_log_entry(f"从 Cloudflare 获取 DNS 记录 '{record_name}' ({record_type}) 失败。", "ERROR")
-        return {"error_response": data} # Indicate failure by returning the error response for context
+        return {"error_response": data} 
 
 def _delete_cloudflare_dns_record(zone_id, api_token, record_cf_id):
     if not record_cf_id:
@@ -432,7 +449,6 @@ def _delete_cloudflare_dns_record(zone_id, api_token, record_cf_id):
         return True
     else:
         add_log_entry(f"删除 Cloudflare DNS 记录 ID: {record_cf_id} 失败。", "ERROR")
-        # Error details already logged by _cf_api_request
         return False
 
 def _update_cloudflare_dns_record(zone_id, api_token, record_cf_id, record_name, record_type, current_ip, ttl, proxied):
@@ -493,7 +509,7 @@ def _generate_origin_rule_description(record_name, dest_port, local_record_id):
 def batch_manage_origin_rules(local_records_with_intent, zone_id, api_token):
     add_log_entry("--- 开始批量 Origin Rule 管理 ---", "INFO")
 
-    if not api_token or not zone_id: # Should be pre-checked by caller
+    if not api_token or not zone_id: 
         add_log_entry("Origin Rule 管理: Cloudflare API Token 或 Zone ID 未提供。", "ERROR")
         return local_records_with_intent, None
 
@@ -503,7 +519,7 @@ def batch_manage_origin_rules(local_records_with_intent, zone_id, api_token):
         for rec in local_records_with_intent:
             if rec.get("origin_rule_enabled"):
                 rec["origin_rule_id"] = None
-        return local_records_with_intent, None # None indicates critical CF failure
+        return local_records_with_intent, None 
 
     current_cf_rules = current_ruleset_data.get("rules", [])
     cf_ruleset_description = current_ruleset_data.get("description", "DDNS Managed Origin Rules")
@@ -592,7 +608,7 @@ def batch_manage_origin_rules(local_records_with_intent, zone_id, api_token):
     if not any_change_to_cf_ruleset_needed and not any_change_to_local_data:
         add_log_entry("Origin Rule 管理: 未检测到 Cloudflare 规则集或本地记录的 Origin Rule 相关字段需要更改。", "INFO")
         add_log_entry("--- 结束批量 Origin Rule 管理 (无更改) ---", "INFO")
-        return updated_local_records_list, False # False = CF not updated successfully (because not attempted)
+        return updated_local_records_list, False 
 
     if not any_change_to_cf_ruleset_needed and any_change_to_local_data:
         add_log_entry("Origin Rule 管理: Cloudflare 规则集无需更改，但本地记录信息已更新 (例如，ID同步)。", "INFO")
@@ -687,18 +703,18 @@ def _process_single_record_dns_part(record_conf_orig, current_public_ipv4, curre
     if isinstance(cf_dns_full_record_or_error, dict) and "error_response" in cf_dns_full_record_or_error:
         api_fetch_failed = True
         record_status["cloudflare_ip"] = "获取CF记录失败"
-    elif cf_dns_full_record_or_error: # Successfully fetched and record exists
+    elif cf_dns_full_record_or_error: 
         cf_dns_full_record = cf_dns_full_record_or_error
         cf_dns_record_id = cf_dns_full_record.get("id")
         cloudflare_ip_on_cf = cf_dns_full_record.get("content")
         cf_proxied_status_on_cf = cf_dns_full_record.get("proxied", False)
         record_status["cloudflare_ip"] = cloudflare_ip_on_cf
-    else: # Successfully fetched, but record does not exist (cf_dns_full_record_or_error is None)
+    else: 
         record_status["cloudflare_ip"] = "未找到"
 
     if api_fetch_failed:
         record_status["message"] = "获取 Cloudflare DNS 记录信息失败。"
-    elif cf_dns_record_id: # Record exists on Cloudflare
+    elif cf_dns_record_id: 
         ip_needs_update = (target_ip != cloudflare_ip_on_cf)
         proxy_needs_update = (record_conf["proxied"] != cf_proxied_status_on_cf)
         if not ip_needs_update and not proxy_needs_update:
@@ -712,7 +728,7 @@ def _process_single_record_dns_part(record_conf_orig, current_public_ipv4, curre
                 record_status["message"] = f"DNS 更新成功 (IP: {target_ip}, 代理: {'启用' if record_conf['proxied'] else '禁用'})。"
                 record_status["last_updated_cloudflare"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             else: record_status["message"] = f"DNS 更新失败。"
-    else: # Record does not exist on Cloudflare (and API fetch was successful)
+    else: 
         add_log_entry(f"DNS 记录 '{record_conf['name']}' ({record_conf['type']}) 不存在，尝试创建。", "INFO")
         created_record_id = _create_cloudflare_dns_record(zone_id, api_token, record_conf["name"], record_conf["type"], target_ip, record_conf["ttl"], record_conf["proxied"])
         if created_record_id:
@@ -738,7 +754,6 @@ def run_ddns_update_job(manual_trigger=False):
         app_status["status_message"] = "DDNS 更新任务正在运行..."
     add_log_entry("--- 开始 DDNS 更新检查 ---")
 
-    # Read global config under lock
     with GLOBAL_CONFIG_LOCK:
         cf_api_token = GLOBAL_CONFIG["CF_API_TOKEN"]
         cf_zone_id = GLOBAL_CONFIG["CF_ZONE_ID"]
@@ -755,18 +770,17 @@ def run_ddns_update_job(manual_trigger=False):
         return
 
     current_public_ipv4, current_public_ipv6 = None, None
-    with APP_STATUS_LOCK: # Lock for updating app_status IP fields
+    with APP_STATUS_LOCK: 
         if enable_ipv4_ddns:
             current_public_ipv4 = get_public_ipv4()
             app_status["current_ipv4"] = current_public_ipv4 if current_public_ipv4 else "获取失败"
         else: app_status["current_ipv4"] = "已禁用 (全局)"
         if enable_ipv6_ddns:
-            current_public_ipv6 = get_stable_ipv6_windows(ddns_interface_name) # Pass interface name
+            current_public_ipv6 = get_stable_ipv6_windows(ddns_interface_name) 
             app_status["current_ipv6"] = current_public_ipv6 if current_public_ipv6 else "获取失败"
         else: app_status["current_ipv6"] = "已禁用 (全局)"
 
     with DDNS_RECORDS_LOCK:
-        # Create a copy of records to process to avoid holding lock during long parallel operations
         records_to_process_in_parallel = [dict(r) for r in DDNS_RECORDS]
 
     if not records_to_process_in_parallel:
@@ -784,7 +798,7 @@ def run_ddns_update_job(manual_trigger=False):
             future = executor.submit(_process_single_record_dns_part, 
                                      record_conf_for_thread, 
                                      current_public_ipv4, current_public_ipv6,
-                                     cf_zone_id, cf_api_token, # Pass necessary global configs
+                                     cf_zone_id, cf_api_token, 
                                      enable_ipv4_ddns, enable_ipv6_ddns)
             future_to_index[future] = i
             
@@ -812,39 +826,34 @@ def run_ddns_update_job(manual_trigger=False):
             status_res, conf_res = processed_dns_data_futures[i]
             intermediate_records_status.append(status_res)
             local_records_with_dns_updates_and_origin_intent.append(conf_res)
-        else: # Fallback, should ideally not be reached if try-except in loop is robust
+        else: 
             add_log_entry(f"记录 {records_to_process_in_parallel[i].get('name', 'Unknown')} 未收到并行处理结果(严重内部错误)。", "CRITICAL")
-            # Construct a minimal error status and use original config
             original_record_conf = ensure_record_fields(dict(records_to_process_in_parallel[i]))
             error_status = {
                 "id": original_record_conf["id"], "name": original_record_conf["name"], "type": original_record_conf["type"],
-                "message": "未收到并行处理结果(严重内部错误)。", # ... other fields with defaults ...
+                "message": "未收到并行处理结果(严重内部错误)。", 
             }
-            intermediate_records_status.append(ensure_record_fields(error_status)) # ensure all fields
+            intermediate_records_status.append(ensure_record_fields(error_status)) 
             local_records_with_dns_updates_and_origin_intent.append(original_record_conf)
 
 
     with APP_STATUS_LOCK: app_status["records_status"] = intermediate_records_status
 
     final_ddns_records_after_origin_rules, cf_origin_rules_put_success = batch_manage_origin_rules(
-        local_records_with_dns_updates_and_origin_intent, cf_zone_id, cf_api_token # Pass zone_id and api_token
+        local_records_with_dns_updates_and_origin_intent, cf_zone_id, cf_api_token 
     )
     
     needs_records_save = False
-    with DDNS_RECORDS_LOCK: # Lock for comparing and updating DDNS_RECORDS
-        # Compare original DDNS_RECORDS (or rather, its state before batch_manage) with final_ddns_records_after_origin_rules
-        # This is tricky because DDNS_RECORDS itself might have changed if another web request came in.
-        # The comparison for needs_records_save should be based on whether `final_ddns_records_after_origin_rules`
-        # differs from `local_records_with_dns_updates_and_origin_intent` in origin rule fields.
+    with DDNS_RECORDS_LOCK: 
         for i_idx, record_before_origin_batch in enumerate(local_records_with_dns_updates_and_origin_intent):
-            if i_idx < len(final_ddns_records_after_origin_rules): # Ensure index exists
+            if i_idx < len(final_ddns_records_after_origin_rules): 
                 record_after_origin_batch = final_ddns_records_after_origin_rules[i_idx]
                 if (record_before_origin_batch.get("origin_rule_id") != record_after_origin_batch.get("origin_rule_id") or
                     record_before_origin_batch.get("origin_rule_description") != record_after_origin_batch.get("origin_rule_description") or
                     record_before_origin_batch.get("origin_rule_enabled") != record_after_origin_batch.get("origin_rule_enabled")):
                     needs_records_save = True
                     break
-            else: # Mismatch in length, indicates a problem, assume save needed
+            else: 
                 needs_records_save = True
                 add_log_entry("Origin rule processing returned a list of different length than input. Forcing save.", "WARNING")
                 break
@@ -854,14 +863,13 @@ def run_ddns_update_job(manual_trigger=False):
         if cf_origin_rules_put_success is None:
             add_log_entry("由于 Origin Rule 管理器发生严重故障，记录文件可能不会保存最新的 Origin Rule ID。", "ERROR")
         
-        # Update the global DDNS_RECORDS list
         DDNS_RECORDS[:] = final_ddns_records_after_origin_rules
 
     if needs_records_save:
         add_log_entry("检测到记录的 Origin Rule 相关信息已更改或CF已更新，将保存 DDNS 记录文件。", "INFO")
-        save_ddns_records() # This handles its own DDNS_RECORDS_LOCK
+        save_ddns_records() 
 
-    _sync_app_status_records_display() # This handles its own locks
+    _sync_app_status_records_display() 
 
     with APP_STATUS_LOCK:
         app_status["status_message"] = "DDNS 更新检查完成。"
@@ -875,14 +883,9 @@ flask_app.secret_key = os.urandom(24)
 
 @flask_app.before_request
 def check_authentication():
-    # ADMIN_ACCOUNT_SET is loaded once at start, assume its state is stable for this check
-    # or reload it under lock if it could change dynamically post-startup in a way not covered by setup_admin
     if request.endpoint in ['setup_admin', 'login', 'static']: return None
     
-    # For ADMIN_ACCOUNT_SET check, ensure it's the latest status if it could be set by another thread
-    # However, it's typically set once. If concerned, re-load_admin_credentials here.
-    # For simplicity, assume initial load is sufficient for this check across requests.
-    _admin_creds_temp = load_admin_credentials() # Ensures ADMIN_ACCOUNT_SET is fresh for this check
+    _admin_creds_temp = load_admin_credentials() 
 
     if not ADMIN_ACCOUNT_SET:
         flash("请先设置管理员账户。", "warning")
@@ -895,7 +898,7 @@ def check_authentication():
 @flask_app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'logged_in' in session: return redirect(url_for('index'))
-    admin_creds = load_admin_credentials() # Handles its own lock
+    admin_creds = load_admin_credentials() 
     if not ADMIN_ACCOUNT_SET: return redirect(url_for('setup_admin'))
     if request.method == 'POST':
         username = request.form['username']
@@ -921,8 +924,7 @@ def logout():
 
 @flask_app.route('/setup_admin', methods=['GET', 'POST'])
 def setup_admin():
-    # Check ADMIN_ACCOUNT_SET status (load_admin_credentials updates it)
-    load_admin_credentials() # Ensure ADMIN_ACCOUNT_SET is fresh
+    load_admin_credentials() 
     if ADMIN_ACCOUNT_SET and 'logged_in' not in session :
         if request.method == 'GET': flash("管理员账户已设置，请登录。", "info")
         return redirect(url_for('login'))
@@ -939,7 +941,7 @@ def setup_admin():
         elif len(password) < 6: flash("密码长度至少为6个字符。", "error")
         else:
             hashed_password = generate_password_hash(password)
-            if save_admin_credentials(username, hashed_password): # Handles its own lock
+            if save_admin_credentials(username, hashed_password): 
                 flash("管理员账户设置成功！请登录。", "success")
                 add_log_entry(f"管理员账户 '{username}' 首次设置成功。", "INFO")
                 return redirect(url_for('login'))
@@ -951,7 +953,7 @@ def setup_admin():
 
 @flask_app.route('/')
 def index():
-    with APP_STATUS_LOCK: # Make a shallow copy of app_status for rendering
+    with APP_STATUS_LOCK: 
         status_snapshot = {key: list(val) if isinstance(val, list) else val for key, val in app_status.items()}
     return render_template('index.html', status=status_snapshot, username=session.get('username', '访客'))
 
@@ -971,17 +973,17 @@ def trigger_update():
 
 @flask_app.route('/status_json')
 def status_json():
-    with APP_STATUS_LOCK: # Make a shallow copy
+    with APP_STATUS_LOCK: 
         status_copy = {key: list(val) if isinstance(val, list) else val for key, val in app_status.items()}
     return jsonify(status_copy)
 
 
 @flask_app.route('/settings', methods=['GET', 'POST'])
 def settings():
-    global scheduler # Make sure we're referring to the global scheduler instance
+    global scheduler 
     if request.method == 'POST':
         try:
-            with GLOBAL_CONFIG_LOCK: # Lock for modifying GLOBAL_CONFIG
+            with GLOBAL_CONFIG_LOCK: 
                 new_interval_str = request.form.get('interval')
                 new_interval = GLOBAL_CONFIG["DDNS_CHECK_INTERVAL_MINUTES"] 
                 if new_interval_str and new_interval_str.isdigit():
@@ -995,14 +997,14 @@ def settings():
                 GLOBAL_CONFIG["ENABLE_IPV6_DDNS"] = 'enable_ipv6' in request.form
                 GLOBAL_CONFIG["DDNS_INTERFACE_NAME"] = request.form.get('interface_name', '').strip()
             
-            save_global_config() # Handles its own GLOBAL_CONFIG_LOCK for saving
+            save_global_config() 
             
             if scheduler.running:
-                scheduler.shutdown(wait=True) # Wait for current job to finish
+                scheduler.shutdown(wait=True) 
             
-            scheduler = BackgroundScheduler(daemon=True) # Re-initialize
+            scheduler = BackgroundScheduler(daemon=True) 
             current_interval_for_scheduler = 0
-            with GLOBAL_CONFIG_LOCK: # Read interval for scheduler
+            with GLOBAL_CONFIG_LOCK: 
                 current_interval_for_scheduler = GLOBAL_CONFIG["DDNS_CHECK_INTERVAL_MINUTES"]
 
             if current_interval_for_scheduler > 0:
@@ -1018,15 +1020,15 @@ def settings():
             flash(f"保存设置时发生错误: {e}", "error")
         return redirect(url_for('settings'))
     
-    with GLOBAL_CONFIG_LOCK: # Read config for display
+    with GLOBAL_CONFIG_LOCK: 
         current_display_config = GLOBAL_CONFIG.copy()
     return render_template('settings.html', config=current_display_config, username=session.get('username', '访客'))
 
 @flask_app.route('/records', methods=['GET'])
 def records_management():
-    _sync_app_status_records_display() # Handles its own locks
-    with APP_STATUS_LOCK: # Read app_status for rendering
-        records_display_list = list(app_status["records_status"]) # Create a copy
+    _sync_app_status_records_display() 
+    with APP_STATUS_LOCK: 
+        records_display_list = list(app_status["records_status"]) 
     return render_template('records_management.html', records=records_display_list, username=session.get('username', '访客'))
 
 @flask_app.route('/records/add', methods=['GET', 'POST'])
@@ -1034,7 +1036,7 @@ def add_record():
     if request.method == 'POST':
         record_name = request.form['name'].strip()
         record_type = request.form['type'].strip().upper()
-        temp_record_for_form = dict(request.form) # For repopulating form on error
+        temp_record_for_form = dict(request.form) 
         temp_record_for_form['proxied'] = 'proxied' in request.form
         temp_record_for_form['enabled'] = 'enabled' in request.form
         temp_record_for_form['origin_rule_enabled'] = 'origin_rule_enabled' in request.form
@@ -1046,7 +1048,7 @@ def add_record():
             flash("记录类型只能是 A 或 AAAA！", "error")
             return render_template('record_form.html', record=temp_record_for_form, form_title="添加新记录", username=session.get('username', '访客'))
         
-        with DDNS_RECORDS_LOCK: # Check for duplicates under lock
+        with DDNS_RECORDS_LOCK: 
             if any(r['name'].lower() == record_name.lower() and r['type'] == record_type for r in DDNS_RECORDS):
                 flash(f"已存在同名同类型的记录: '{record_name}' ({record_type})。", "error")
                 return render_template('record_form.html', record=temp_record_for_form, form_title="添加新记录", username=session.get('username', '访客'))
@@ -1070,7 +1072,7 @@ def add_record():
             new_record_filled["origin_rule_description"] = _generate_origin_rule_description(new_record_filled["name"], new_record_filled["origin_rule_destination_port"], new_record_filled["id"])
         
         with DDNS_RECORDS_LOCK: DDNS_RECORDS.append(new_record_filled)
-        save_ddns_records() # Handles its own lock
+        save_ddns_records() 
         _sync_app_status_records_display()
         flash(f"记录 '{new_record_filled['name']}' 已成功添加！更改将在下次DDNS检查时同步到Cloudflare。", "success")
         return redirect(url_for('records_management'))
@@ -1080,8 +1082,8 @@ def add_record():
 @flask_app.route('/records/edit/<record_id>', methods=['GET', 'POST'])
 def edit_record(record_id):
     record_to_edit_orig = None
-    with DDNS_RECORDS_LOCK: # Find record under lock
-        record_to_edit_orig = next((dict(r) for r in DDNS_RECORDS if r.get("id") == record_id), None) # Get a copy
+    with DDNS_RECORDS_LOCK: 
+        record_to_edit_orig = next((dict(r) for r in DDNS_RECORDS if r.get("id") == record_id), None) 
     
     if not record_to_edit_orig:
         flash("未找到指定记录！", "error")
@@ -1092,15 +1094,13 @@ def edit_record(record_id):
     if request.method == 'POST':
         original_name = record_to_edit['name']
         new_record_name = request.form['name'].strip()
-        new_record_type = record_to_edit['type'] # Type not editable
+        new_record_type = record_to_edit['type'] 
 
         form_data_on_error = dict(record_to_edit)
-        form_data_on_error.update(request.form.to_dict(flat=False)) # Get form data, possibly multi-value
-        # Ensure checkbox values are correctly interpreted from form
+        form_data_on_error.update(request.form.to_dict(flat=False)) 
         form_data_on_error['proxied'] = 'proxied' in request.form
         form_data_on_error['enabled'] = 'enabled' in request.form
         form_data_on_error['origin_rule_enabled'] = 'origin_rule_enabled' in request.form
-        # Convert single-item lists from to_dict(flat=False) to single values for relevant fields
         for key in ['name', 'ttl', 'origin_rule_destination_port']:
             if key in form_data_on_error and isinstance(form_data_on_error[key], list):
                 form_data_on_error[key] = form_data_on_error[key][0] if form_data_on_error[key] else ""
@@ -1110,13 +1110,12 @@ def edit_record(record_id):
             flash("记录名不能为空！", "error")
             return render_template('record_form.html', record=form_data_on_error, form_title=f"编辑记录: {original_name}", username=session.get('username', '访客'))
 
-        with DDNS_RECORDS_LOCK: # Check for duplicates under lock
+        with DDNS_RECORDS_LOCK: 
             if new_record_name.lower() != original_name.lower() and \
                any(r['id'] != record_id and r['name'].lower() == new_record_name.lower() and r['type'] == new_record_type for r in DDNS_RECORDS):
                 flash(f"不能修改为已存在的记录名和类型组合: '{new_record_name}' ({new_record_type})。", "error")
                 return render_template('record_form.html', record=form_data_on_error, form_title=f"编辑记录: {original_name}", username=session.get('username', '访客'))
 
-        # Update fields in the local copy `record_to_edit`
         record_to_edit['name'] = new_record_name
         record_to_edit['proxied'] = 'proxied' in request.form
         record_to_edit['ttl'] = int(request.form.get('ttl', 120))
@@ -1137,14 +1136,14 @@ def edit_record(record_id):
             record_to_edit["origin_rule_description"] = _generate_origin_rule_description(record_to_edit["name"], record_to_edit["origin_rule_destination_port"], record_to_edit["id"])
         else: record_to_edit["origin_rule_description"] = ""
         
-        with DDNS_RECORDS_LOCK: # Update the actual DDNS_RECORDS list
+        with DDNS_RECORDS_LOCK: 
             found_index = -1
             for i, r_loop_var in enumerate(DDNS_RECORDS):
                 if r_loop_var["id"] == record_id:
                     DDNS_RECORDS[i] = record_to_edit
                     found_index = i
                     break
-            if found_index == -1: # Should not happen if initial find was successful
+            if found_index == -1: 
                 flash("更新记录时发生内部错误，未找到记录的索引。", "error")
                 return redirect(url_for('records_management'))
 
@@ -1159,19 +1158,19 @@ def edit_record(record_id):
 @flask_app.route('/records/delete/<record_id>', methods=['POST'])
 def delete_record(record_id):
     record_to_delete_local_copy = None
-    with DDNS_RECORDS_LOCK: # Get a copy of the record to delete
+    with DDNS_RECORDS_LOCK: 
         record_found = next((r for r in DDNS_RECORDS if r.get("id") == record_id), None)
         if record_found:
-            record_to_delete_local_copy = dict(record_found) # Work with a copy for CF operations
+            record_to_delete_local_copy = dict(record_found) 
 
     if not record_to_delete_local_copy:
         flash("未找到要删除的本地记录。", "error")
         return redirect(url_for('records_management'))
 
     record_name = record_to_delete_local_copy['name']
-    record_type = record_to_delete_local_copy['type'] # Needed for _get_cloudflare_dns_record
+    record_type = record_to_delete_local_copy['type'] 
 
-    with GLOBAL_CONFIG_LOCK: # Get API token and Zone ID
+    with GLOBAL_CONFIG_LOCK: 
         api_token = GLOBAL_CONFIG['CF_API_TOKEN']
         zone_id = GLOBAL_CONFIG['CF_ZONE_ID']
     
@@ -1205,18 +1204,17 @@ def delete_record(record_id):
             cf_dns_info_or_error = _get_cloudflare_dns_record(zone_id, api_token, record_name, record_type)
             if isinstance(cf_dns_info_or_error, dict) and "error_response" in cf_dns_info_or_error:
                 dns_deleted_ok = False; flash(f"记录 {record_name}: 无法确认 Cloudflare DNS 记录状态 (API查询失败)。", "error")
-            elif cf_dns_info_or_error and cf_dns_info_or_error.get("id"): # Record exists
+            elif cf_dns_info_or_error and cf_dns_info_or_error.get("id"): 
                 if not _delete_cloudflare_dns_record(zone_id, api_token, cf_dns_info_or_error.get("id")):
                     dns_deleted_ok = False; flash(f"从 Cloudflare 删除 DNS 记录 '{record_name}' 失败。", "error")
-            elif cf_dns_info_or_error is None: # Record not found, which is fine for deletion
+            elif cf_dns_info_or_error is None: 
                  add_log_entry(f"DNS 记录 '{record_name}' 在 Cloudflare 上未找到，无需删除。", "INFO")
-            # If cf_dns_info_or_error is some other non-error dict but without 'id', it's unexpected. Assume cannot delete.
             elif isinstance(cf_dns_info_or_error, dict) and not cf_dns_info_or_error.get("id"):
                 dns_deleted_ok = False; flash(f"记录 {record_name}: 获取到的DNS记录信息不完整，无法删除。", "error")
 
 
         if origin_rule_deleted_ok and dns_deleted_ok:
-            with DDNS_RECORDS_LOCK: # Remove from local list
+            with DDNS_RECORDS_LOCK: 
                 DDNS_RECORDS[:] = [r for r in DDNS_RECORDS if r.get("id") != record_id]
             save_ddns_records()
             _sync_app_status_records_display()
@@ -1234,7 +1232,7 @@ def delete_record(record_id):
 @flask_app.route('/records/toggle/<record_id>', methods=['POST'])
 def toggle_record(record_id):
     updated = False
-    with DDNS_RECORDS_LOCK: # Lock for modifying DDNS_RECORDS
+    with DDNS_RECORDS_LOCK: 
         record_to_toggle = next((r for r in DDNS_RECORDS if r.get("id") == record_id), None)
         if record_to_toggle:
             record_to_toggle['enabled'] = not record_to_toggle['enabled']
@@ -1264,9 +1262,9 @@ def _delete_single_dns_record_task(record_info, zone_id, api_token):
         elif cf_dns_info_or_error and cf_dns_info_or_error.get("id"):
             if not _delete_cloudflare_dns_record(zone_id, api_token, cf_dns_info_or_error.get("id")):
                 dns_deleted_ok = False; message = f"记录 {record_name}: Cloudflare DNS 记录删除失败。"
-        elif cf_dns_info_or_error is None: # Not found, okay for deletion
+        elif cf_dns_info_or_error is None: 
             message = f"记录 {record_name}: Cloudflare DNS 记录未找到，无需删除。"
-        elif isinstance(cf_dns_info_or_error, dict) and not cf_dns_info_or_error.get("id"): # Unexpected response
+        elif isinstance(cf_dns_info_or_error, dict) and not cf_dns_info_or_error.get("id"): 
             dns_deleted_ok = False; message = f"记录 {record_name}: 获取到的DNS记录信息不完整。"
 
     except Exception as e:
@@ -1287,7 +1285,7 @@ def batch_delete_records():
     overall_success_count, overall_failure_count = 0, 0
     messages = []
 
-    with GLOBAL_CONFIG_LOCK: # Get API token and Zone ID
+    with GLOBAL_CONFIG_LOCK: 
         api_token = GLOBAL_CONFIG['CF_API_TOKEN']
         zone_id = GLOBAL_CONFIG['CF_ZONE_ID']
     
@@ -1296,12 +1294,12 @@ def batch_delete_records():
 
     temp_ddns_records_for_origin_batch = []
     records_info_for_dns_deletion = {}
-    with DDNS_RECORDS_LOCK: # Prepare records for batch operations
+    with DDNS_RECORDS_LOCK: 
         for rec_orig in DDNS_RECORDS:
-            rec_copy = dict(rec_orig) # Work with copies
+            rec_copy = dict(rec_orig) 
             if rec_copy["id"] in record_ids_to_delete:
-                rec_copy["origin_rule_enabled"] = False # Signal disable for batch Origin Rule processing
-                records_info_for_dns_deletion[rec_copy["id"]] = dict(rec_orig) # Store original copy for DNS deletion
+                rec_copy["origin_rule_enabled"] = False 
+                records_info_for_dns_deletion[rec_copy["id"]] = dict(rec_orig) 
             temp_ddns_records_for_origin_batch.append(rec_copy)
 
     updated_records_after_origin_batch, cf_origin_rules_put_success = batch_manage_origin_rules(
@@ -1326,7 +1324,7 @@ def batch_delete_records():
                 add_log_entry(f"记录 {record_id}: DNS删除任务异常: {e}", "ERROR")
 
     for r_id in record_ids_to_delete:
-        r_info_original = records_info_for_dns_deletion.get(r_id) # Use the copy made earlier
+        r_info_original = records_info_for_dns_deletion.get(r_id) 
         if not r_info_original:
             messages.append(f"记录ID {r_id}: 未在待删除记录信息中找到，跳过处理。"); overall_failure_count += 1; continue
 
@@ -1337,7 +1335,7 @@ def batch_delete_records():
         record_origin_rule_handled_successfully = False
         if cf_origin_rules_put_success: record_origin_rule_handled_successfully = True
         elif not cf_origin_rules_put_success and not r_info_original.get("origin_rule_enabled") and not r_info_original.get("origin_rule_id"):
-            record_origin_rule_handled_successfully = True # No rule to handle, so considered "handled"
+            record_origin_rule_handled_successfully = True 
         
         if record_origin_rule_handled_successfully and dns_deleted_ok:
             successfully_removed_local_ids.add(r_id); overall_success_count += 1
@@ -1360,11 +1358,11 @@ def batch_delete_records():
 
 @flask_app.route('/admin_settings', methods=['GET', 'POST'])
 def admin_settings():
-    admin_creds = load_admin_credentials() # Handles lock
+    admin_creds = load_admin_credentials() 
     if not admin_creds:
         flash("管理员账户信息缺失。", "error"); return redirect(url_for('index'))
         
-    with GLOBAL_CONFIG_LOCK: # Read GLOBAL_CONFIG for display
+    with GLOBAL_CONFIG_LOCK: 
         current_display_config = GLOBAL_CONFIG.copy()
         if GLOBAL_CONFIG["CF_API_TOKEN"]:
             token_len = len(GLOBAL_CONFIG["CF_API_TOKEN"])
@@ -1376,7 +1374,6 @@ def admin_settings():
         form_type = request.form.get('form_type')
         action_taken = False
         if form_type == 'password_change':
-            # Password change logic (no direct GLOBAL_CONFIG access)
             old_password = request.form.get('old_password', '').strip()
             new_password = request.form.get('new_password', '').strip()
             confirm_new_password = request.form.get('confirm_new_password', '').strip()
@@ -1389,7 +1386,7 @@ def admin_settings():
                 elif len(new_password) < 6: flash("新密码长度至少为6个字符。", "error")
                 else:
                     new_hashed_password = generate_password_hash(new_password)
-                    if save_admin_credentials(admin_creds["username"], new_hashed_password): # Handles lock
+                    if save_admin_credentials(admin_creds["username"], new_hashed_password): 
                         flash("管理员密码已成功修改！请重新登录。", "success")
                         session.pop('logged_in', None); session.pop('username', None)
                         action_taken = True; return redirect(url_for('login'))
@@ -1398,9 +1395,8 @@ def admin_settings():
             new_api_token_form = request.form.get('cf_api_token', '').strip()
             new_zone_id_form = request.form.get('cf_zone_id', '').strip()
             
-            with GLOBAL_CONFIG_LOCK: # Lock for modifying GLOBAL_CONFIG
-                actual_new_api_token = GLOBAL_CONFIG["CF_API_TOKEN"] # Default to old
-                # If form field is different from the masked display OR if original token was empty, take form value
+            with GLOBAL_CONFIG_LOCK: 
+                actual_new_api_token = GLOBAL_CONFIG["CF_API_TOKEN"] 
                 if new_api_token_form != current_display_config["CF_API_TOKEN_DISPLAY"] or not GLOBAL_CONFIG["CF_API_TOKEN"]:
                     actual_new_api_token = new_api_token_form
 
@@ -1418,8 +1414,8 @@ def admin_settings():
                         flash(f"Cloudflare API 设置已成功更新 ({', '.join(log_msgs)})！", "success")
                         action_taken = True
                     else: flash("API 设置未发生变化。", "info")
-            if action_taken and (token_changed or zone_id_changed): # Save only if changes were made under lock
-                 save_global_config() # Handles its own lock
+            if action_taken and (token_changed or zone_id_changed): 
+                 save_global_config() 
 
         else: flash("无效的表单提交。", "error")
         if action_taken: return redirect(url_for('admin_settings'))
@@ -1431,11 +1427,11 @@ def admin_settings():
 scheduler = BackgroundScheduler(daemon=True)
 
 if __name__ == '__main__':
-    load_all_config() # Handles its own locks for initial load
+    load_all_config() 
     initial_run_thread = threading.Thread(target=run_ddns_update_job)
     initial_run_thread.start()
     
-    with GLOBAL_CONFIG_LOCK: # Read interval for scheduler setup
+    with GLOBAL_CONFIG_LOCK: 
         interval_minutes = GLOBAL_CONFIG["DDNS_CHECK_INTERVAL_MINUTES"]
     
     if interval_minutes > 0:
@@ -1452,7 +1448,6 @@ if __name__ == '__main__':
         add_log_entry("接收到关闭信号...", "INFO")
     finally:
         if scheduler.running:
-            scheduler.shutdown(wait=True) # Wait for jobs to complete
+            scheduler.shutdown(wait=True) 
             add_log_entry("调度器已关闭。")
         add_log_entry("DDNS 应用已关闭。")
-
